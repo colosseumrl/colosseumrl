@@ -7,6 +7,7 @@ class Player:
     pid = primarykey(int)
 
     number = dimension(int)
+    name = dimension(str)
     action = dimension(int)
     turn = dimension(bool)
 

@@ -11,13 +11,23 @@ class BaseEnvironment(ABC):
         """ Property holding the numpy shape of a single state. """
         raise NotImplementedError
 
+    @property
     @abstractmethod
-    def new_state(self) -> np.ndarray:
+    def observation_shape(self) -> tuple:
+        """ Property holding the numpy shape of a transformed observation state. """
+        raise NotImplementedError
+
+    @abstractmethod
+    def new_state(self, num_players: int = 1) -> np.ndarray:
         """ Create a fresh state. This could return a fixed object or randomly initialized on, depending on the game. """
         raise NotImplementedError
 
     @abstractmethod
-    def next_state(self, state: np.ndarray, player: int, action: int) -> Tuple[np.ndarray, float, bool]:
+    def add_player(self, state: np.ndarray) -> np.ndarray:
+        raise NotImplementedError
+
+    @abstractmethod
+    def next_state(self, state: np.ndarray, player: int, action: int) -> Tuple[np.ndarray, float, bool, int]:
         """
         Compute a single step in the game.
 
@@ -32,7 +42,7 @@ class BaseEnvironment(ABC):
         new_state : np.ndarray
         reward : float
         terminal : bool
-
+        winner: int - Only matters if terminal = True
         """
         raise NotImplementedError
 
