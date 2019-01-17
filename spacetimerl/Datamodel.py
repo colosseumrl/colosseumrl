@@ -3,7 +3,8 @@ from rtypes import dimension, primarykey
 import numpy as np
 import random, sys
 
-class Player:
+@pcc_set
+class Player(object):
     pid = primarykey(int)
 
     number = dimension(int)
@@ -16,9 +17,9 @@ class Player:
 
     state = dimension(str)
 
-    def __init__(self):
+    def __init__(self, name):
         self.pid = random.randint(0, sys.maxsize)
-
+        self.name = name
         self.number = 0
         self.action = 0
         self.turn = False

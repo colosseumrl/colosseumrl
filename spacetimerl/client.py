@@ -1,6 +1,8 @@
 import argparse
 import logging
 
+import spacetime
+
 LOG_FORMAT = "%(asctime)s %(levelname)-6s | %(message)s"
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -23,6 +25,17 @@ def log_params(params, logger=logger):
         logger.info('{}: {}'.format(key, params[key]))
 
 
+def visualize(dataframe):
+    dataframe.pull()
+    world = World()
+    for a in dataframe.read_all(Asteroid):
+        world.asteroids[a.oid] = a
+
+    vis = Visualizer(world)
+    threading.Thread(target=sync, args=[dataframe, world]).start()
+    # Run pygame on the main thread or else
+    vis.run()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
@@ -34,3 +47,6 @@ if __name__ == '__main__':
     dict_args = vars(args)
     log_params(dict_args)
 
+    player_client = Application(visualize, dataframe=(args.host, args.port), Types=[Asteroid, Ship],
+                                version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
+    player_client.start()
