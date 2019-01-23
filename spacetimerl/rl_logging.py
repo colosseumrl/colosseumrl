@@ -67,7 +67,7 @@ def add_handlers_to_logger(logger, logfile=None):
     if use_colorlog:
         formatter = ColoredFormatter(COLORED_LOG_FORMAT, DATE_FORMAT)
     else:
-        formatter = ColoredFormatter(LOG_FORMAT, DATE_FORMAT)
+        formatter = _logging.Formatter(LOG_FORMAT, DATE_FORMAT)
     stream_handler = _logging.StreamHandler()
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)

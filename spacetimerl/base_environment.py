@@ -7,6 +7,18 @@ class BaseEnvironment(ABC):
 
     @property
     @abstractmethod
+    def min_players(self) -> int:
+        """ Property holding the number of players present required to play game. """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def max_players(self) -> int:
+        """ Property holding the max number of players present for a game. """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def state_shape(self) -> tuple:
         """ Property holding the numpy shape of a single state. """
         raise NotImplementedError
@@ -27,7 +39,7 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def next_state(self, state: np.ndarray, player: int, action: int) -> Tuple[np.ndarray, float, bool, int]:
+    def next_state(self, state: np.ndarray, player: int, action: str) -> Tuple[np.ndarray, float, bool, int]:
         """
         Compute a single step in the game.
 
@@ -35,7 +47,7 @@ class BaseEnvironment(ABC):
         ----------
         state : np.ndarray
         player: int
-        action : int
+        action : str
 
         Returns
         -------
@@ -47,7 +59,12 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def valid_actions(self, state: np.ndarray) -> [int]:
+    def valid_actions(self, state: np.ndarray) -> [str]:
+        """ Valid actions for a specific state. """
+        raise NotImplementedError
+
+    @abstractmethod
+    def is_valid_action(self, state: np.ndarray, action: str) -> bool:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
