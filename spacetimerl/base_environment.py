@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, List
 import numpy as np
 
 
@@ -39,14 +39,14 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def next_state(self, state: np.ndarray, player: int, action: str) -> Tuple[np.ndarray, float, bool, int]:
+    def next_state(self, state: np.ndarray, players: [int], action: str) -> Tuple[np.ndarray, float, bool, int, List[int]]:
         """
         Compute a single step in the game.
 
         Parameters
         ----------
         state : np.ndarray
-        player: int
+        players: [int]
         action : str
 
         Returns
@@ -55,6 +55,7 @@ class BaseEnvironment(ABC):
         reward : float
         terminal : bool
         winner: int - Only matters if terminal = True
+        new_players: [int] List of players whos turn it is now.
         """
         raise NotImplementedError
 
