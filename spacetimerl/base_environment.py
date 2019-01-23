@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, List
+from typing import Tuple, List, Union
 import numpy as np
 
 
@@ -30,7 +30,7 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def new_state(self, num_players: int = 1) -> Tuple[np.ndarray, List[int]]:
+    def new_state(self, num_players: int = 1) -> Tuple[object, List[int]]:
         """ Create a fresh state. This could return a fixed object or randomly initialized on, depending on the game.
 
         Returns
@@ -42,22 +42,25 @@ class BaseEnvironment(ABC):
         """
         raise NotImplementedError
 
-    def add_player(self, state: np.ndarray) -> np.ndarray:
-        """ Add a new player to an already existing game.
+    def add_player(self, state: object) -> np.ndarray:
+        """ OPTIONAL Add a new player to an already existing game.
 
-        If your game cannot dynamically change, then you can leave this alone."""
+        If your game cannot dynamically change, then you can leave these methods alone."""
         raise RuntimeError("Cannot add new players to an existing game.")
 
+    def remove_player(self, state: object, player: int) -> np.ndarray:
+        """ OPTIONAL Remove a player from the current game if they disconnect somehow. """
+        raise RuntimeError("Cannot remove players from an existing game.")
 
     @abstractmethod
-    def next_state(self, state: np.ndarray, players: [int], actions: [str]) \
-            -> Tuple[np.ndarray, List[int], List[float], bool, List[int]]:
+    def next_state(self, state: object, players: [int], actions: [str]) \
+            -> Tuple[object, List[int], List[float], bool, Union[List[int], None]]:
         """
         Compute a single step in the game.
 
         Parameters
         ----------
-        state : np.ndarray
+        state : object
             The current state of the game.
         players: [int]
             The players which are taking the given actions.
@@ -66,7 +69,7 @@ class BaseEnvironment(ABC):
 
         Returns
         -------
-        new_state : np.ndarray
+        new_state : object
             The new state of the game.
         new_players: [int]
             List of players whos turn it is in the new state now.
@@ -80,17 +83,18 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def valid_actions(self, state: np.ndarray) -> [str]:
+    def valid_actions(self, state: object) -> [str]:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
     @abstractmethod
-    def is_valid_action(self, state: np.ndarray, action: str) -> bool:
+    def is_valid_action(self, state: object, action: str) -> bool:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
-    def state_to_observation(self, state: np.ndarray, player: int) -> np.ndarray:
+    def state_to_observation(self, state: object, player: int) -> np.ndarray:
         """ Convert the raw game state to the observation for the agent.
+        The observation must be able to be fed into your predictor.
 
         This can return different values for the different players. Default implementation is just the identity."""
-        return state
+        return np.array(state)
