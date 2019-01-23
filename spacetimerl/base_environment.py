@@ -30,32 +30,52 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def new_state(self, num_players: int = 1) -> np.ndarray:
-        """ Create a fresh state. This could return a fixed object or randomly initialized on, depending on the game. """
+    def new_state(self, num_players: int = 1) -> Tuple[np.ndarray, List[int]]:
+        """ Create a fresh state. This could return a fixed object or randomly initialized on, depending on the game.
+
+        Returns
+        -------
+        new_state : np.ndarray
+            A state for the new game.
+        new_players: [int]
+            List of players whos turn it is now.
+        """
         raise NotImplementedError
 
-    @abstractmethod
     def add_player(self, state: np.ndarray) -> np.ndarray:
-        raise NotImplementedError
+        """ Add a new player to an already existing game.
+
+        If your game cannot dynamically change, then you can leave this alone."""
+        raise RuntimeError("Cannot add new players to an existing game.")
+
 
     @abstractmethod
-    def next_state(self, state: np.ndarray, players: [int], action: str) -> Tuple[np.ndarray, float, bool, int, List[int]]:
+    def next_state(self, state: np.ndarray, players: [int], actions: [str]) \
+            -> Tuple[np.ndarray, List[int], List[float], bool, List[int]]:
         """
         Compute a single step in the game.
 
         Parameters
         ----------
         state : np.ndarray
+            The current state of the game.
         players: [int]
-        action : str
+            The players which are taking the given actions.
+        actions : [str]
+            The actions of each player.
 
         Returns
         -------
         new_state : np.ndarray
-        reward : float
+            The new state of the game.
+        new_players: [int]
+            List of players whos turn it is in the new state now.
+        rewards : [float]
+            The reward for each player that acted.
         terminal : bool
-        winner: int - Only matters if terminal = True
-        new_players: [int] List of players whos turn it is now.
+            Whether or not the game has ended.
+        winners: [int]
+            If the game has ended, who are the winners.
         """
         raise NotImplementedError
 
