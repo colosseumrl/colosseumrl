@@ -62,6 +62,8 @@ def server_app(dataframe, env_class):
     state, player_turns = env.new_state(num_players=len(players))
     for i, player in enumerate(players.values()):
         player.finalize_player(number=i, observation=pickle.dumps(env.state_to_observation(state=state, player=i)))
+        if i in player_turns:
+            player.turn = True
 
     players_by_number = dict((p.number, p) for p in players.values())
     dataframe.sync()
@@ -72,10 +74,15 @@ def server_app(dataframe, env_class):
         # Wait for a frame to tick
         fr.tick()
 
+        dataframe.checkout()
+
         # Get the player dataframes of the players whos turn it is right now
         current_players = [p for p in players.values() if p.number in player_turns]
         current_actions = []
         server_state = dataframe.read_one(ServerState, server_state.oid)
+
+        if not all(p.ready_for_action_to_be_taken for p in current_players):
+            continue
 
         # Queue up each players action if it is legal
         # If the player failed to respond in time, we will simply execute the previous action
@@ -86,7 +93,7 @@ def server_app(dataframe, env_class):
             else:
                 logger.info("Player #{}, {}'s, action of {} was invalid, passing empty string as action"
                             .format(player.number, player.name, player.action))
-                current_players.append('')
+                current_actions.append('')
 
         # Execute the current move
         state, player_turns, rewards, terminal, winners = (
@@ -107,6 +114,7 @@ def server_app(dataframe, env_class):
 
         if terminal:
             server_state.terminal = True
+            server_state.winners = pickle.dumps(winners)
             for player_number in winners:
                 players_by_number[player_number].winner = True
             logger.info("Player: {} won the game.".format(winners))

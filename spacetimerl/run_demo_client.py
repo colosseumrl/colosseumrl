@@ -19,7 +19,7 @@ if __name__ == '__main__':
 
         logger.debug("Took step with action {}, got: {}".format(action, (new_obs, reward, terminal, winner)))
         if terminal:
-            logger.info("Game is over. Player {} won".format(winner))
+            logger.info("Game is over. Players {} won".format(winner))
             break
 
         # Simple action policy for test game

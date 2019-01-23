@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def game_is_terminal(dataframe):
-    return dataframe.read_all(ServerState)[0].winner >= 0
+    return dataframe.read_all(ServerState)[0].terminal
 
 
 def client_app(dataframe, remote, parent_remote, player_name):
@@ -67,6 +67,8 @@ def client_app(dataframe, remote, parent_remote, player_name):
                     dataframe.commit()
                     dataframe.push()
 
+                    print("sent action")
+
                     while not player.turn or player.ready_for_action_to_be_taken:
                         fr.tick()
                         dataframe.pull()
@@ -75,15 +77,17 @@ def client_app(dataframe, remote, parent_remote, player_name):
 
                 new_observation = pickle.loads(player.observation)
                 reward = player.reward_from_last_turn
-                winner = dataframe.read_all(ServerState)[0].winner
                 terminal = game_is_terminal(dataframe)
 
                 if terminal:
+                    winners = pickle.loads(dataframe.read_all(ServerState)[0].winners)
                     player.acknowledges_game_over = True
                     dataframe.commit()
                     dataframe.push()
+                else:
+                    winners = None
 
-                remote.send((new_observation, reward, terminal, winner))
+                remote.send((new_observation, reward, terminal, winners))
 
             elif cmd == 'close':
                 dataframe.delete_one(Player, player)
@@ -125,7 +129,7 @@ class ClientNetworkEnv:
         new_observation : np.ndarray
         reward : float
         terminal : bool
-        winner: int - Only matters if terminal = True
+        winners: list - Only matters if terminal = True
         """
         self.remote.send(('step', action))
         return self.remote.recv()

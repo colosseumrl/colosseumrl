@@ -41,9 +41,10 @@ class ServerState(object):
     oid = primarykey(int)
     env_class_name = dimension(str)
     terminal = dimension(bool)
-    winner = dimension(int)  # non-negative value also implies game over
+    winners = dimension(str)
 
     def __init__(self, env_class_name):
         self.oid = random.randint(0, sys.maxsize)
         self.env_class_name = env_class_name
         self.terminal = False
+        self.winners = ""
