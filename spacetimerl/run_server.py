@@ -1,7 +1,4 @@
 import argparse
-import sys
-import time
-import datetime
 import pickle
 
 import spacetime
@@ -9,6 +6,7 @@ from spacetime import Application
 from spacetimerl.data_model import Player, ServerState
 from spacetimerl.rl_logging import init_logging
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
+from spacetimerl.base_environment import BaseEnvironment
 
 logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
@@ -37,92 +35,88 @@ def log_params(params):
 
 def server_app(dataframe, env_class):
     fr = FrameRateKeeper(max_frame_rate=SERVER_TICK_RATE)
+    players = {}
 
-    dataframe.checkout()
     server_state = ServerState(env_class.__name__)
     dataframe.add_one(ServerState, server_state)
     dataframe.commit()
-    dataframe.push()
 
-    env = env_class()
+    env: BaseEnvironment = env_class()
 
     logger.info("Waiting for enough players to join ({} required)...".format(env.min_players))
-    last_player_count = 0
-    last_joined_player_pids_and_names = {}
-    while last_player_count < env.min_players:
+    while len(players) < env.min_players:
         fr.tick()
-
         dataframe.sync()
-        players = dataframe.read_all(Player)
-        new_player_count = len(players)
 
-        if new_player_count > last_player_count:
-            for player in players:
-                if player.pid not in last_joined_player_pids_and_names:
-                    last_joined_player_pids_and_names[player.pid] = player.name
-                    logger.info("New player joined with name: {}".format(player.name))
+        new_players = dict((p.pid, p) for p in dataframe.read_all(Player))
 
-        if new_player_count < last_player_count:
-            for pid in last_joined_player_pids_and_names.keys():
-                if pid not in [player.pid for player in players]:
-                    logger.info("Player {} has left.".format(last_joined_player_pids_and_names[pid]))
-                    del last_joined_player_pids_and_names[pid]
+        for new_id in new_players.keys() - players.keys():
+            logger.info("New player joined with name: {}".format(new_players[new_id].name))
 
-        last_player_count = new_player_count
+        for remove_id in players.keys() - new_players.keys():
+            logger.info("Player {} has left.".format(players[remove_id].name))
+
+        players = new_players
 
     logger.info("Finalizing players and setting up new environment.")
-    current_env_state = env.new_state(num_players=last_player_count)
-    player_pids_by_turn = {}
-    for i, player in enumerate(dataframe.read_all(Player)):
-        player.finalize_player(number=i, observation=pickle.dumps(env.state_to_observation(state=current_env_state, player=i)))
-        player_pids_by_turn[i] = player.pid
+    state, player_turns = env.new_state(num_players=len(players))
+    for i, player in enumerate(players.values()):
+        player.finalize_player(number=i, observation=pickle.dumps(env.state_to_observation(state=state, player=i)))
+
+    players_by_number = dict((p.number, p) for p in players.values())
     dataframe.sync()
 
-    env_done = False
-    current_player_turn = 0
+    terminal = False
     turn_count = 0
-    while not env_done:
+    while not terminal:
+        # Wait for a frame to tick
         fr.tick()
-        dataframe.pull()
-        dataframe.checkout()
-        current_player = dataframe.read_one(Player, player_pids_by_turn[current_player_turn])
 
+        # Get the player dataframes of the players whos turn it is right now
+        current_players = [p for p in players.values() if p.number in player_turns]
+        current_actions = []
         server_state = dataframe.read_one(ServerState, server_state.oid)
 
-        if current_player.ready_for_action_to_be_taken:
-            if env.is_valid_action(state=current_env_state, action=current_player.action):
-                action_to_execute = current_player.action
+        # Queue up each players action if it is legal
+        # If the player failed to respond in time, we will simply execute the previous action
+        # If it is invalid, we will pass in a blank string
+        for player in current_players:
+            if env.is_valid_action(state=state, action=player.action):
+                current_actions.append(player.action)
             else:
                 logger.info("Player #{}, {}'s, action of {} was invalid, passing empty string as action"
-                            .format(current_player_turn, current_player.name, current_player.action))
-                action_to_execute = ""
+                            .format(player.number, player.name, player.action))
+                current_players.append('')
 
-            next_state, reward, env_done, winner = env.next_state(state=current_env_state, player=current_player_turn, action=action_to_execute)
+        # Execute the current move
+        state, player_turns, rewards, terminal, winners = (
+            env.next_state(state=state, players=player_turns, actions=current_actions)
+        )
 
-            current_env_state = next_state
-            current_player.reward_from_last_turn = float(reward)
+        # Update the player data from the previous move.
+        for player, reward in zip(current_players, rewards):
+            player.reward_from_last_turn = float(reward)
+            player.ready_for_action_to_be_taken = False
+            player.turn = False
 
-            if env_done:
-                server_state.winner = winner
-                logger.info("Player {} won the game.".format(winner))
+        # Tell the new players that its their turn and provide observation
+        for player_number in player_turns:
+            player = players_by_number[player_number]
+            player.observation = pickle.dumps(env.state_to_observation(state=state, player=player_number))
+            player.turn = True
 
-            current_player.ready_for_action_to_be_taken = False
-            current_player.turn = False
+        if terminal:
+            server_state.terminal = True
+            for player_number in winners:
+                players_by_number[player_number].winner = True
+            logger.info("Player: {} won the game.".format(winners))
 
-            turn_count += 1
-            current_player_turn = (current_player_turn + 1) % last_player_count
-            dataframe.commit()
-            dataframe.push()
-
-        else:
-            if current_player.turn is False:
-                current_player.turn = True
-                dataframe.commit()
-                dataframe.push()
-                logger.debug("Player #{}'s turn...".format(current_player_turn))
+        turn_count += 1
+        dataframe.commit()
 
     for player in dataframe.read_all(Player):
         player.turn = True
+
     dataframe.commit()
     dataframe.push()
 
