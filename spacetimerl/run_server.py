@@ -12,11 +12,10 @@ logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
 DEFAULT_PARAMS = {
     "port": 7777,
+    "lenient_mode": True,
+    "tick_rate": 60,
     "env_class_name": "test_game.TestGame"
 }
-
-SERVER_TICK_RATE = 60
-
 
 def get_class(kls):
     parts = kls.split('.')
@@ -33,8 +32,8 @@ def log_params(params):
         logger.info('{}: {}'.format(k, params[k]))
 
 
-def server_app(dataframe, env_class):
-    fr = FrameRateKeeper(max_frame_rate=SERVER_TICK_RATE)
+def server_app(dataframe, env_class, args):
+    fr = FrameRateKeeper(max_frame_rate=args['tick_rate'])
     players = {}
 
     server_state = ServerState(env_class.__name__)
@@ -81,7 +80,7 @@ def server_app(dataframe, env_class):
         current_actions = []
         server_state = dataframe.read_one(ServerState, server_state.oid)
 
-        if not all(p.ready_for_action_to_be_taken for p in current_players):
+        if args['lenient_mode'] and not all(p.ready_for_action_to_be_taken for p in current_players):
             continue
 
         # Queue up each players action if it is legal
@@ -156,4 +155,4 @@ if __name__ == '__main__':
 
     server_app = Application(server_app, server_port=args.port, Types=[Player, ServerState],
                              version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-    server_app.start(env_class)
+    server_app.start(env_class, vars(args))
