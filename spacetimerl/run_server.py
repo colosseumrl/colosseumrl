@@ -17,6 +17,7 @@ DEFAULT_PARAMS = {
     "env_class_name": "test_game.TestGame"
 }
 
+
 def get_class(kls):
     parts = kls.split('.')
     module = ".".join(parts[:-1])
@@ -87,7 +88,7 @@ def server_app(dataframe, env_class, args):
         # If the player failed to respond in time, we will simply execute the previous action
         # If it is invalid, we will pass in a blank string
         for player in current_players:
-            if env.is_valid_action(state=state, action=player.action):
+            if env.is_valid_action(state=state, player=player.number, action=player.action):
                 current_actions.append(player.action)
             else:
                 logger.info("Player #{}, {}'s, action of {} was invalid, passing empty string as action"
