@@ -33,11 +33,11 @@ class TestGame(BaseEnvironment):
             return state, [(players[0] + 1) % self.max_players], [distance], True, players
         return state, [(players[0] + 1) % self.max_players], [distance], False, None
 
-    def valid_actions(self, state: np.ndarray) -> [str]:
+    def valid_actions(self, state: np.ndarray, player: int) -> [str]:
         return map(lambda x: str(x), np.arange(100))
 
-    def is_valid_action(self, state: np.ndarray, action: str) -> bool:
-        return action in self.valid_actions(state)
+    def is_valid_action(self, state: np.ndarray, player: int, action: str) -> bool:
+        return action in self.valid_actions(state, player)
 
     def state_to_observation(self, state: np.ndarray, player: int) -> np.ndarray:
         return state
