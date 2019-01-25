@@ -49,12 +49,12 @@ class TurnBasedEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def valid_actions(self, state: object) -> [str]:
+    def valid_actions(self, state: object, player: int) -> [str]:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
     @abstractmethod
-    def is_valid_action(self, state: object, action: str) -> bool:
+    def is_valid_action(self, state: object, player: int, action: str) -> bool:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
@@ -64,6 +64,7 @@ class TurnBasedEnvironment(ABC):
 
         This can return different values for the different players. Default implementation is just the identity."""
         return np.array(state)
+
 
 class TurnBasedWrapper(BaseEnvironment):
     def __init__(self, base: TurnBasedEnvironment):
@@ -88,17 +89,31 @@ class TurnBasedWrapper(BaseEnvironment):
     def new_state(self, num_players: int = 1) -> Tuple[object, List[int]]:
         return (num_players, self.base.new_state(num_players)), [0]
 
-    def next_state(self, state: object, players: [int], actions: [str]) -> Tuple[
-        object, List[int], List[float], bool, Union[List[int], None]]:
-        return self.base.next_state(state)
+    def next_state(self, state: object, players: [int], actions: [str]) \
+            -> Tuple[object, List[int], List[float], bool, Union[List[int], None]]:
+        num_players, state = state
+        player: int = players[0]
+        action: str = actions[0]
 
-    def valid_actions(self, state: object) -> [str]:
-        pass
+        state, reward, terminal, winner = self.base.next_state(state, player, action)
 
-    def is_valid_action(self, state: object, action: str) -> bool:
-        pass
+        state = (num_players, state)
+        new_players = [(player + 1) % num_players]
+        rewards = [reward]
+        winners = None if winner is None else [winner]
+
+        return state, new_players, rewards, terminal, winners
+
+    def valid_actions(self, state: object, player: int) -> [str]:
+        num_players, state = state
+        return self.base.valid_actions(state, player)
+
+    def is_valid_action(self, state: object, player: int, action: str) -> bool:
+        num_players, state = state
+        return self.base.is_valid_action(state, player, action)
 
     def state_to_observation(self, state: object, player: int) -> np.ndarray:
-        return super().state_to_observation(state, player)
+        num_players, state = state
+        return self.base.state_to_observation(state, player)
 
 

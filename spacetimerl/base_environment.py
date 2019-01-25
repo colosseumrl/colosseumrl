@@ -83,12 +83,12 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def valid_actions(self, state: object) -> [str]:
+    def valid_actions(self, state: object, player: int) -> [str]:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
     @abstractmethod
-    def is_valid_action(self, state: object, action: str) -> bool:
+    def is_valid_action(self, state: object, player: int, action: str) -> bool:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
