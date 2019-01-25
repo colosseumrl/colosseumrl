@@ -45,7 +45,7 @@ class TurnBasedEnvironment(ABC):
 
     @abstractmethod
     def next_state(self, state: object, player: int, action: str) \
-            -> Tuple[object, float, bool, Union[int, None]]:
+            -> Tuple[object, float, bool, Union[List[int], None]]:
         raise NotImplementedError
 
     @abstractmethod
@@ -95,12 +95,12 @@ class TurnBasedWrapper(BaseEnvironment):
         player: int = players[0]
         action: str = actions[0]
 
-        state, reward, terminal, winner = self.base.next_state(state, player, action)
+        state, reward, terminal, winners = self.base.next_state(state, player, action)
 
         state = (num_players, state)
         new_players = [(player + 1) % num_players]
         rewards = [reward]
-        winners = None if winner is None else [winner]
+        winners = winners
 
         return state, new_players, rewards, terminal, winners
 
