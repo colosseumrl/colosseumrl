@@ -20,12 +20,6 @@ class TurnBasedEnvironment(ABC):
 
     @property
     @abstractmethod
-    def state_shape(self) -> tuple:
-        """ Property holding the numpy shape of a single state. """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
     def observation_shape(self) -> tuple:
         """ Property holding the numpy shape of a transformed observation state. """
         raise NotImplementedError
