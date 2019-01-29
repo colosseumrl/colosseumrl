@@ -45,6 +45,12 @@ class _Player(object):
         self.acknowledges_game_over = False  # So the server can exit once it knows players got their final pull in.
         self.winner = False
 
+    def finalize_player(self, number: int, observations: Dict[str, np.ndarray]):
+        raise NotImplementedError
+
+    def set_observation(self, observations: Dict[str, np.ndarray]):
+        raise NotImplementedError
+
 
 @pcc_set
 class ServerState(object):

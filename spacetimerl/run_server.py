@@ -3,10 +3,12 @@ import pickle
 
 import spacetime
 from spacetime import Application
-from spacetimerl.data_model import Player, ServerState
+from spacetimerl.data_model import Player, ServerState, _Player
 from spacetimerl.rl_logging import init_logging
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
 from spacetimerl.base_environment import BaseEnvironment
+
+from typing import Type, Dict
 
 logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
@@ -33,9 +35,9 @@ def log_params(params):
         logger.info('{}: {}'.format(k, params[k]))
 
 
-def server_app(dataframe, env_class, args):
-    fr = FrameRateKeeper(max_frame_rate=args['tick_rate'])
-    players = {}
+def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment], args: dict):
+    fr: FrameRateKeeper = FrameRateKeeper(max_frame_rate=args['tick_rate'])
+    players: Dict[int, _Player] = {}
 
     server_state = ServerState(env_class.__name__)
     dataframe.add_one(ServerState, server_state)
@@ -48,7 +50,7 @@ def server_app(dataframe, env_class, args):
         fr.tick()
         dataframe.sync()
 
-        new_players = dict((p.pid, p) for p in dataframe.read_all(Player))
+        new_players: Dict[int, _Player] = dict((p.pid, p) for p in dataframe.read_all(Player))
 
         for new_id in new_players.keys() - players.keys():
             logger.info("New player joined with name: {}".format(new_players[new_id].name))
@@ -61,11 +63,11 @@ def server_app(dataframe, env_class, args):
     logger.info("Finalizing players and setting up new environment.")
     state, player_turns = env.new_state(num_players=len(players))
     for i, player in enumerate(players.values()):
-        player.finalize_player(number=i, observation=pickle.dumps(env.state_to_observation(state=state, player=i)))
+        player.finalize_player(number=i, observations=env.state_to_observation(state=state, player=i))
         if i in player_turns:
             player.turn = True
 
-    players_by_number = dict((p.number, p) for p in players.values())
+    players_by_number: Dict[int, _Player] = dict((p.number, p) for p in players.values())
     dataframe.sync()
 
     terminal = False
@@ -74,6 +76,7 @@ def server_app(dataframe, env_class, args):
         # Wait for a frame to tick
         fr.tick()
 
+        # Get new data
         dataframe.checkout()
 
         # Get the player dataframes of the players whos turn it is right now
@@ -109,7 +112,7 @@ def server_app(dataframe, env_class, args):
         # Tell the new players that its their turn and provide observation
         for player_number in player_turns:
             player = players_by_number[player_number]
-            player.observation = pickle.dumps(env.state_to_observation(state=state, player=player_number))
+            player.set_observation(env.state_to_observation(state=state, player=player_number))
             player.turn = True
 
         if terminal:
@@ -152,8 +155,10 @@ if __name__ == '__main__':
     args = parser.parse_args()
     log_params(args)
 
-    env_class = get_class(args.env_class_name)
+    env_class: Type[BaseEnvironment] = get_class(args.env_class_name)
 
-    server_app = Application(server_app, server_port=args.port, Types=[Player, ServerState],
+    server_app = Application(server_app,
+                             server_port=args.port,
+                             Types=[Player(env_class.observation_names()), ServerState],
                              version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
     server_app.start(env_class, vars(args))
