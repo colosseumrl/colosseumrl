@@ -17,10 +17,16 @@ class BaseEnvironment(ABC):
         """ Property holding the max number of players present for a game. """
         raise NotImplementedError
 
+    @staticmethod
+    @abstractmethod
+    def observation_names() -> List[str]:
+        """ Static method for returning the names of the observation objects """
+        raise NotImplementedError
+
     @property
     @abstractmethod
     def observation_shape(self) -> Dict[str, tuple]:
-        """ Property holding the numpy shape of a transformed observation state. """
+        """ Maps each observation name to a numpy shape"""
         raise NotImplementedError
 
     @abstractmethod
@@ -87,8 +93,7 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     def state_to_observation(self, state: object, player: int) -> Dict[str, np.ndarray]:
-        """ Convert the raw game state to the observation for the agent.
-        The observation must be able to be fed into your predictor.
+        """ Convert the raw game state to the observation for the agent. Maps each observation name into an observation.
 
         This can return different values for the different players. Default implementation is just the identity."""
         return {'state': np.array(state)}

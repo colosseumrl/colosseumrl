@@ -1,11 +1,11 @@
 from rtypes import pcc_set, merge
 from rtypes import dimension, primarykey
-from typing import Dict
+from typing import List, Dict
 import numpy as np
 import random, sys
 
 
-def Player(observation_types: Dict[str, tuple]):
+def Player(observation_names: List[str]):
     """ Creates a proper player class with the attributes necessary to transfer the observations. """
     class Player(_Player):
         def finalize_player(self, number: int, observations: Dict[str, np.ndarray]):
@@ -16,7 +16,7 @@ def Player(observation_types: Dict[str, tuple]):
             for key, value in observations.items():
                 self.__setattr__(key, value)
 
-    for name in observation_types:
+    for name in observation_names:
         setattr(Player, name, dimension(np.array))
 
     return pcc_set(Player)
