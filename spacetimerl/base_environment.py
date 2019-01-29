@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, Dict
 import numpy as np
 
 
@@ -19,13 +19,7 @@ class BaseEnvironment(ABC):
 
     @property
     @abstractmethod
-    def state_shape(self) -> tuple:
-        """ Property holding the numpy shape of a single state. """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def observation_shape(self) -> tuple:
+    def observation_shape(self) -> Dict[str, tuple]:
         """ Property holding the numpy shape of a transformed observation state. """
         raise NotImplementedError
 
@@ -92,9 +86,9 @@ class BaseEnvironment(ABC):
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
-    def state_to_observation(self, state: object, player: int) -> np.ndarray:
+    def state_to_observation(self, state: object, player: int) -> Dict[str, np.ndarray]:
         """ Convert the raw game state to the observation for the agent.
         The observation must be able to be fed into your predictor.
 
         This can return different values for the different players. Default implementation is just the identity."""
-        return np.array(state)
+        return {'state': np.array(state)}
