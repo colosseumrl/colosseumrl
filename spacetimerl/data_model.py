@@ -8,6 +8,9 @@ import random, sys
 def Player(observation_names: List[str]):
     """ Creates a proper player class with the attributes necessary to transfer the observations. """
     class Player(_Player):
+        def __init__(self, name: str):
+            super().__init__(name)
+
         def finalize_player(self, number: int, observations: Dict[str, np.ndarray]):
             self.number = number
             self.set_observation(observations)
@@ -56,11 +59,13 @@ class _Player(object):
 class ServerState(object):
     oid = primarykey(int)
     env_class_name = dimension(str)
+    env_dimensions = dimension(tuple)
     terminal = dimension(bool)
     winners = dimension(str)
 
-    def __init__(self, env_class_name):
+    def __init__(self, env_class_name, env_dimensions):
         self.oid = random.randint(0, sys.maxsize)
         self.env_class_name = env_class_name
+        self.env_dimensions = tuple(env_dimensions)
         self.terminal = False
         self.winners = ""

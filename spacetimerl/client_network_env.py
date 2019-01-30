@@ -5,9 +5,10 @@ import pickle
 import logging
 
 import spacetime
-from spacetime import Application
+from spacetime import Application, Dataframe
 from spacetimerl.data_model import Player, ServerState
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
+from random import randint
 
 CLIENT_TICK_RATE = 60
 
@@ -18,19 +19,23 @@ def game_is_terminal(dataframe):
     return dataframe.read_all(ServerState)[0].terminal
 
 
-def client_app(dataframe, remote, parent_remote, player_name):
+def client_app(dataframe, remote, parent_remote, player_name, player_class):
     # parent_remote.close() # we are in a separate thread, not process
 
+    # Create player class and add ourselves to the dataframe
     dataframe.pull()
     dataframe.checkout()
-    player = Player(name=player_name)
-    dataframe.add_one(Player, player)
+
+    player = player_class(name=player_name)
+    dataframe.add_one(player_class, player)
+
     dataframe.commit()
     dataframe.push()
 
+    # Check to see if it worked
     dataframe.pull()
     dataframe.checkout()
-    if dataframe.read_one(Player, player.pid) is not None:
+    if dataframe.read_one(player_class, player.pid) is not None:
         logger.info("Connected to server, waiting for game to start...")
     else:
         logger.info("Server rejected adding your player, perhaps the max player limit has been reached.")
@@ -38,11 +43,12 @@ def client_app(dataframe, remote, parent_remote, player_name):
 
     fr = FrameRateKeeper(CLIENT_TICK_RATE)
 
+    # Wait for game to start
     while player.number == -1:
         fr.tick()
         dataframe.pull()
         dataframe.checkout()
-        player = dataframe.read_one(Player, player.pid)
+        player = dataframe.read_one(player_class, player.pid)
 
     logger.info("Game has started, acting as player number {}".format(player.number))
 
@@ -50,7 +56,8 @@ def client_app(dataframe, remote, parent_remote, player_name):
         fr.tick()
         dataframe.pull()
         dataframe.checkout()
-        player = dataframe.read_one(Player, player.pid)
+        player = dataframe.read_one(player_class, player.pid)
+
     remote.send(pickle.loads(player.observation))
     logger.debug("First turn for player {} started".format(player.number))
 
@@ -73,7 +80,7 @@ def client_app(dataframe, remote, parent_remote, player_name):
                         fr.tick()
                         dataframe.pull()
                         dataframe.checkout()
-                        player = dataframe.read_one(Player, player.pid)
+                        player = dataframe.read_one(player_class, player.pid)
 
                 new_observation = pickle.loads(player.observation)
                 reward = player.reward_from_last_turn
@@ -90,7 +97,7 @@ def client_app(dataframe, remote, parent_remote, player_name):
                 remote.send((new_observation, reward, terminal, winners))
 
             elif cmd == 'close':
-                dataframe.delete_one(Player, player)
+                dataframe.delete_one(player_class, player)
                 remote.close()
                 break
 
@@ -104,9 +111,26 @@ class ClientNetworkEnv:
 
     def __init__(self, server_hostname, port, player_name):
         self.remote, app_remote = Pipe()
-        self.player_client = Application(client_app, dataframe=(server_hostname, port), Types=[Player, ServerState],
-                                    version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-        self.player_client.start_async(remote=app_remote, parent_remote=self.remote, player_name=player_name)
+
+        # Get the dimensions required for the
+        df = Dataframe("dimension_getter_{}".format(player_name), [ServerState], details=(server_hostname, port))
+        df.pull()
+        df.checkout()
+        dimension_names: [str] = df.read_all(ServerState)[0].env_dimensions
+        del df
+
+        player_class = Player(dimension_names)
+
+        self.player_client = Application(client_app,
+                                         dataframe=(server_hostname, port),
+                                         Types=[player_class, ServerState],
+                                         version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
+
+        self.player_client.start_async(remote=app_remote,
+                                       parent_remote=self.remote,
+                                       player_name=player_name,
+                                       player_class=player_class)
+
         self.first_observation = self.remote.recv()
 
     def close(self):

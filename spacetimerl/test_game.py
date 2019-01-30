@@ -1,4 +1,4 @@
-from typing import Tuple, List, Union
+from typing import Tuple, List, Union, Dict
 import numpy as np
 from spacetimerl.base_environment import BaseEnvironment
 
@@ -13,13 +13,13 @@ class TestGame(BaseEnvironment):
     def max_players(self) -> int:
         return 2
 
-    @property
-    def state_shape(self) -> tuple:
-        return 1,
+    @staticmethod
+    def observation_names() -> List[str]:
+        return ['state']
 
     @property
     def observation_shape(self):
-        return 1,
+        return {"state", [1]}
 
     def new_state(self, num_players: int = 1):
         return np.random.randint(0, 100, (1,)), [0]
@@ -39,5 +39,5 @@ class TestGame(BaseEnvironment):
     def is_valid_action(self, state: np.ndarray, player: int, action: str) -> bool:
         return action in self.valid_actions(state, player)
 
-    def state_to_observation(self, state: np.ndarray, player: int) -> np.ndarray:
-        return state
+    def state_to_observation(self, state: np.ndarray, player: int) -> Dict[str, np.ndarray]:
+        return {"state": state}

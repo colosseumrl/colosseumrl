@@ -35,11 +35,11 @@ def log_params(params):
         logger.info('{}: {}'.format(k, params[k]))
 
 
-def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment], args: dict):
+def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment], player_class: Type[_Player], args: dict):
     fr: FrameRateKeeper = FrameRateKeeper(max_frame_rate=args['tick_rate'])
     players: Dict[int, _Player] = {}
 
-    server_state = ServerState(env_class.__name__)
+    server_state = ServerState(env_class.__name__, env_class.observation_names())
     dataframe.add_one(ServerState, server_state)
     dataframe.commit()
 
@@ -50,7 +50,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
         fr.tick()
         dataframe.sync()
 
-        new_players: Dict[int, _Player] = dict((p.pid, p) for p in dataframe.read_all(Player))
+        new_players: Dict[int, _Player] = dict((p.pid, p) for p in dataframe.read_all(player_class))
 
         for new_id in new_players.keys() - players.keys():
             logger.info("New player joined with name: {}".format(new_players[new_id].name))
@@ -125,7 +125,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
         turn_count += 1
         dataframe.commit()
 
-    for player in dataframe.read_all(Player):
+    for player in dataframe.read_all(player_class):
         player.turn = True
 
     dataframe.commit()
@@ -136,7 +136,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
     # TODO| players would have a similar error when the server would quit while they are pulling.
     # TODO| May need to talk to Rohan about cleanly exiting this kind of situation.
     # TODO| It would also be great if we could instead properly confirm that recipients got a message.
-    for player in dataframe.read_all(Player):
+    for player in dataframe.read_all(player_class):
         while not player.acknowledges_game_over:
             fr.tick()
             dataframe.checkout()
@@ -156,9 +156,10 @@ if __name__ == '__main__':
     log_params(args)
 
     env_class: Type[BaseEnvironment] = get_class(args.env_class_name)
+    player_class: Type[_Player] = Player(env_class.observation_names())
 
     server_app = Application(server_app,
                              server_port=args.port,
-                             Types=[Player(env_class.observation_names()), ServerState],
+                             Types=[player_class, ServerState],
                              version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-    server_app.start(env_class, vars(args))
+    server_app.start(env_class, player_class, vars(args))
