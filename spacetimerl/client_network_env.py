@@ -19,7 +19,7 @@ def game_is_terminal(dataframe):
     return dataframe.read_all(ServerState)[0].terminal
 
 
-def client_app(dataframe, remote, parent_remote, player_name, player_class):
+def client_app(dataframe, remote, parent_remote, player_name, player_class, dimension_names, dimensions):
     # parent_remote.close() # we are in a separate thread, not process
 
     # Create player class and add ourselves to the dataframe
@@ -58,7 +58,10 @@ def client_app(dataframe, remote, parent_remote, player_name, player_class):
         dataframe.checkout()
         player = dataframe.read_one(player_class, player.pid)
 
-    remote.send(pickle.loads(player.observation))
+    for dimension_name in dimension_names:
+        dimensions[dimension_name] = getattr(player, dimension_name)
+
+    remote.send(True)
     logger.debug("First turn for player {} started".format(player.number))
 
     try:
@@ -82,7 +85,11 @@ def client_app(dataframe, remote, parent_remote, player_name, player_class):
                         dataframe.checkout()
                         player = dataframe.read_one(player_class, player.pid)
 
-                new_observation = pickle.loads(player.observation)
+                for dimension_name in dimension_names:
+                    dimensions[dimension_name] = getattr(player, dimension_name)
+
+                print("dimensions: {}".format(dimensions))
+
                 reward = player.reward_from_last_turn
                 terminal = game_is_terminal(dataframe)
 
@@ -94,7 +101,7 @@ def client_app(dataframe, remote, parent_remote, player_name, player_class):
                 else:
                     winners = None
 
-                remote.send((new_observation, reward, terminal, winners))
+                remote.send((reward, terminal, winners))
 
             elif cmd == 'close':
                 dataframe.delete_one(player_class, player)
@@ -119,6 +126,8 @@ class ClientNetworkEnv:
         dimension_names: [str] = df.read_all(ServerState)[0].env_dimensions
         del df
 
+        self._dimensions = {}
+
         player_class = Player(dimension_names)
 
         self.player_client = Application(client_app,
@@ -129,9 +138,12 @@ class ClientNetworkEnv:
         self.player_client.start_async(remote=app_remote,
                                        parent_remote=self.remote,
                                        player_name=player_name,
-                                       player_class=player_class)
+                                       player_class=player_class,
+                                       dimension_names=dimension_names,
+                                       dimensions=self._dimensions)
 
-        self.first_observation = self.remote.recv()
+        assert self.remote.recv() is True
+        self.first_observation = self._dimensions.copy()
 
     def close(self):
         self.remote.send(("close", None))
@@ -140,7 +152,7 @@ class ClientNetworkEnv:
     def get_first_observation(self):
         return self.first_observation
 
-    def step(self, action: str) -> Tuple[np.ndarray, float, bool, int]:
+    def step(self, action: str) -> Tuple[dict, float, bool, int]:
         """
         Compute a single step in the game.
 
@@ -156,5 +168,6 @@ class ClientNetworkEnv:
         winners: list - Only matters if terminal = True
         """
         self.remote.send(('step', action))
-        return self.remote.recv()
+        reward, terminal, winners = self.remote.recv()
+        return self._dimensions.copy(), reward, terminal, winners
 
