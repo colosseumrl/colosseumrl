@@ -19,7 +19,7 @@ def game_is_terminal(dataframe):
     return dataframe.read_all(ServerState)[0].terminal
 
 
-def client_app(dataframe, remote, parent_remote, player_name, player_class, dimension_names, dimensions):
+def client_app(dataframe, remote, parent_remote, player_name, player_class, dimension_names):
     # parent_remote.close() # we are in a separate thread, not process
 
     # Create player class and add ourselves to the dataframe
@@ -58,10 +58,7 @@ def client_app(dataframe, remote, parent_remote, player_name, player_class, dime
         dataframe.checkout()
         player = dataframe.read_one(player_class, player.pid)
 
-    for dimension_name in dimension_names:
-        dimensions[dimension_name] = getattr(player, dimension_name)
-
-    remote.send(True)
+    remote.send({dimension_name: getattr(player, dimension_name) for dimension_name in dimension_names})
     logger.debug("First turn for player {} started".format(player.number))
 
     try:
@@ -85,10 +82,7 @@ def client_app(dataframe, remote, parent_remote, player_name, player_class, dime
                         dataframe.checkout()
                         player = dataframe.read_one(player_class, player.pid)
 
-                for dimension_name in dimension_names:
-                    dimensions[dimension_name] = getattr(player, dimension_name)
-
-                print("dimensions: {}".format(dimensions))
+                dimensions = {dimension_name: getattr(player, dimension_name) for dimension_name in dimension_names}
 
                 reward = player.reward_from_last_turn
                 terminal = game_is_terminal(dataframe)
@@ -101,7 +95,7 @@ def client_app(dataframe, remote, parent_remote, player_name, player_class, dime
                 else:
                     winners = None
 
-                remote.send((reward, terminal, winners))
+                remote.send((dimensions, reward, terminal, winners))
 
             elif cmd == 'close':
                 dataframe.delete_one(player_class, player)
@@ -126,8 +120,6 @@ class ClientNetworkEnv:
         dimension_names: [str] = df.read_all(ServerState)[0].env_dimensions
         del df
 
-        self._dimensions = {}
-
         player_class = Player(dimension_names)
 
         self.player_client = Application(client_app,
@@ -139,11 +131,9 @@ class ClientNetworkEnv:
                                        parent_remote=self.remote,
                                        player_name=player_name,
                                        player_class=player_class,
-                                       dimension_names=dimension_names,
-                                       dimensions=self._dimensions)
+                                       dimension_names=dimension_names)
 
-        assert self.remote.recv() is True
-        self.first_observation = self._dimensions.copy()
+        self.first_observation = self.remote.recv()
 
     def close(self):
         self.remote.send(("close", None))
@@ -168,6 +158,6 @@ class ClientNetworkEnv:
         winners: list - Only matters if terminal = True
         """
         self.remote.send(('step', action))
-        reward, terminal, winners = self.remote.recv()
-        return self._dimensions.copy(), reward, terminal, winners
+        dimensions, reward, terminal, winners = self.remote.recv()
+        return dimensions, reward, terminal, winners
 
