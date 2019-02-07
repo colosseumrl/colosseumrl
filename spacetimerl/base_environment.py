@@ -97,3 +97,18 @@ class BaseEnvironment(ABC):
 
         This can return different values for the different players. Default implementation is just the identity."""
         return {'state': np.array(state)}
+
+    # Serialization Methods
+    @staticmethod
+    def serializable() -> bool:
+        return False
+
+    @staticmethod
+    @abstractmethod
+    def serialize_state(state: object) -> str:
+        raise NotImplementedError
+
+    @staticmethod
+    @abstractmethod
+    def unserialize_state(serialized_state: str) -> object:
+        raise NotImplementedError
