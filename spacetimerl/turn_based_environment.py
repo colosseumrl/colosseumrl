@@ -65,6 +65,24 @@ class TurnBasedEnvironment(ABC):
         return {'state': np.array(state)}
 
 
+    # Serialization Methods
+    @staticmethod
+    def serializable() -> bool:
+        """ Whether or not this class supports serialization of the current state.
+            This is necessary to allow the client to perform tree search. """
+        return False
+
+    @staticmethod
+    def serialize_state(state: object) -> str:
+        """ Serialize the state and convert it to a string to be sent between the clients. """
+        raise NotImplementedError
+
+    @staticmethod
+    def unserialize_state(serialized_state: str) -> object:
+        """ Convert the serialized string back into a proper state. """
+        raise NotImplementedError
+
+
 def turned_based_environment(cls: Type[TurnBasedEnvironment]):
     class TurnBasedWrapper(BaseEnvironment):
         def __init__(self, *args, **kwargs):
@@ -117,6 +135,18 @@ def turned_based_environment(cls: Type[TurnBasedEnvironment]):
         def state_to_observation(self, state: object, player: int) -> Dict[str, np.ndarray]:
             num_players, state = state
             return self.base.state_to_observation(state, player)
+
+        @staticmethod
+        def serializable():
+            return cls.serializable()
+
+        @staticmethod
+        def serialize_state(state: object):
+            return cls.serialize_state(state)
+
+        @staticmethod
+        def unserialize_state(serialized_state: str):
+            return cls.unserialize_state(serialized_state)
 
     return TurnBasedWrapper
 

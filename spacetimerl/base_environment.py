@@ -101,14 +101,16 @@ class BaseEnvironment(ABC):
     # Serialization Methods
     @staticmethod
     def serializable() -> bool:
+        """ Whether or not this class supports serialization of the state.
+            This is necessary to allow the client to perform tree search. """
         return False
 
     @staticmethod
-    @abstractmethod
     def serialize_state(state: object) -> str:
+        """ Serialize the state and convert it to a string to be sent between the clients. """
         raise NotImplementedError
 
     @staticmethod
-    @abstractmethod
     def unserialize_state(serialized_state: str) -> object:
+        """ Convert the serialized string back into a proper state. """
         raise NotImplementedError
