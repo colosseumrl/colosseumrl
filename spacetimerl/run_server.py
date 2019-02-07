@@ -15,6 +15,7 @@ logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 DEFAULT_PARAMS = {
     "port": 7777,
     "lenient_mode": True,
+    "tree_search": True,
     "tick_rate": 60,
     "env_class_name": "test_game.TestGame"
 }
@@ -62,6 +63,9 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
 
     logger.info("Finalizing players and setting up new environment.")
     state, player_turns = env.new_state(num_players=len(players))
+    if args["tree_search"] and env.serializable():
+        server_state.serialized_state = env.serialize_state(state)
+
     for i, player in enumerate(players.values()):
         player.finalize_player(number=i, observations=env.state_to_observation(state=state, player=i))
         if i in player_turns:
@@ -102,6 +106,9 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
         state, player_turns, rewards, terminal, winners = (
             env.next_state(state=state, players=player_turns, actions=current_actions)
         )
+
+        if args["tree_search"] and env.serializable():
+            server_state.serialized_state = env.serialize_state(state)
 
         # Update the player data from the previous move.
         for player, reward in zip(current_players, rewards):
