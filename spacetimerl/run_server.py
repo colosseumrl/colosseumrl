@@ -22,6 +22,8 @@ DEFAULT_PARAMS = {
 
 
 def get_class(kls):
+    from sys import path
+    path.append("/Users/CalebPitts/Documents/Files/School/College/18-19-Year/Research/Winter/Blockus")
     parts = kls.split('.')
     module = ".".join(parts[:-1])
     m = __import__(module)
