@@ -102,6 +102,10 @@ def client_app(dataframe, remote, parent_remote, player_name, player_class, dime
                 remote.close()
                 break
 
+            elif cmd == 'get_server_state':
+                server_state = dataframe.read_all(ServerState)[0]
+                remote.send(server_state)
+
             else:
                 raise NotImplementedError
     except KeyboardInterrupt:
@@ -161,3 +165,14 @@ class ClientNetworkEnv:
         dimensions, reward, terminal, winners = self.remote.recv()
         return dimensions, reward, terminal, winners
 
+    def get_server_state(self) -> Tuple[str, Tuple[int], bool, str, str]:
+        self.remote.send("get_server_state")
+        server_state = self.remote.recv()
+
+        env_class_name = server_state.env_class_name
+        env_dimensions = server_state.env_dimensions
+        terminal = server_state.terminal
+        winners = server_state.winners
+        serialized_state =server_state.serialized_state
+
+        return env_class_name, env_dimensions, terminal, winners, serialized_state
