@@ -83,7 +83,7 @@ class TurnBasedEnvironment(ABC):
         raise NotImplementedError
 
 
-def turned_based_environment(cls: Type[TurnBasedEnvironment]):
+def turn_based_environment(cls):
     class TurnBasedWrapper(BaseEnvironment):
         def __init__(self, *args, **kwargs):
             self.base = cls(*args, **kwargs)
