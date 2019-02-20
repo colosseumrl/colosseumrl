@@ -1,12 +1,13 @@
 # WIP
 import spacetime
+import numpy as np
 from spacetime import Dataframe, Application
-from spacetimerl.data_model import ServerState, Player
+from spacetimerl.data_model import ServerState, Player, _Player
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
 from spacetimerl.base_environment import BaseEnvironment
 
 from time import sleep
-from typing import Callable, Type, Optional
+from typing import Callable, Type, Optional, List, Dict
 import pickle
 import logging
 
@@ -16,13 +17,20 @@ logger = logging.getLogger(__name__)
 class ClientEnv:
     TickRate = 60
 
-    def __init__(self, dataframe: Dataframe, player_class, dimensions):
-        self.dataframe = dataframe
-        self.player_class = player_class
-        self.dimensions = dimensions
+    def __init__(self, dataframe: Dataframe, dimensions: List[str], player_class: Type[Player],
+                 server_environment: Optional[Type[BaseEnvironment]] = None):
+        self.dataframe: Dataframe = dataframe
+        self._server_state: ServerState = self.dataframe.read_all(ServerState)[0]
+        self.player: _Player = None
 
-        self.fr = FrameRateKeeper(self.TickRate)
-        self.player = None
+        self.player_class: Type[BaseEnvironment] = player_class
+        self.dimensions: List[str] = dimensions
+
+        self._server_environment: Optional[BaseEnvironment] = None
+        if server_environment is not None:
+            self._server_environment = server_environment(self._server_state.env_config)
+
+        self.fr: FrameRateKeeper = FrameRateKeeper(self.TickRate)
 
     def __pull(self):
         self.dataframe.pull()
@@ -36,21 +44,44 @@ class ClientEnv:
         self.fr.tick()
 
     @property
-    def observation(self):
+    def observation(self) -> Dict[str, np.ndarray]:
+        """ Current Observation for this player. """
         if self.player is None:
             raise ConnectionError("Not connected to server")
 
         return {dimension: getattr(self.player, dimension) for dimension in self.dimensions}
 
     @property
-    def server_state(self):
-        return self.dataframe.read_all(ServerState)[0]
+    def server_state(self) -> ServerState:
+        """ Current full server state. """
+        return self._server_state
+
+    @property
+    def terminal(self) -> bool:
+        """ Whether the game is over or not. """
+        return self.server_state.terminal
+
+    @property
+    def winners(self) -> Optional[List[int]]:
+        """ The winners of the game. """
+        return pickle.loads(self.server_state.winners)
+
+    @property
+    def server_environment(self) -> BaseEnvironment:
+        return self._server_environment
+
+    @property
+    def full_state(self):
+        """ Full serer state for the game if the environment and the server support it. """
+        if not self.server_environment.serializable():
+            raise ValueError("Current Environment does not support full state for clients.")
+        return self.server_environment.unserialize_state(self.server_state.serialized_state)
 
     def connect(self, name: str):
         """ Connect to the remote server and wait for the game to start. """
         # Add this player to the game.
         self.__pull()
-        self.player = self.player_class(name=name)
+        self.player: _Player = self.player_class(name=name)
         self.dataframe.add_one(self.player_class, self.player)
         self.__push()
         sleep(0.1)
@@ -70,7 +101,7 @@ class ClientEnv:
 
         logger.info("Game has started. We are player {}".format(self.player.number))
 
-    def first_observation(self):
+    def wait_for_turn(self):
         while not self.player.turn:
             self.__tick()
             self.__pull()
@@ -88,7 +119,7 @@ class ClientEnv:
                 self.__pull()
 
         reward = self.player.reward_from_last_turn
-        terminal = self.server_state.terminal
+        terminal = self.terminal
 
         if terminal:
             winners = pickle.loads(self.server_state.winners)
@@ -98,6 +129,10 @@ class ClientEnv:
             winners = None
 
         return self.observation, reward, terminal, winners
+
+    def render(self):
+        print("No render defined for default client environment")
+
 
 
 def client_app(dataframe: Dataframe, app: "RLApp", client_function: Callable,
