@@ -8,31 +8,21 @@ from spacetimerl.rl_logging import init_logging
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
 from spacetimerl.base_environment import BaseEnvironment
 
+from importlib import import_module
 from typing import Type, Dict
 
 logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
-DEFAULT_PARAMS = {
-    "port": 7777,
-    "lenient_mode": True,
-    "tree_search": True,
-    "tick_rate": 60,
-    "env_class_name": "test_game.TestGame"
-}
 
-
-def get_class(kls):
-    from sys import path
-    path.append("/Users/CalebPitts/Documents/Files/School/College/18-19-Year/Research/Winter/Blockus")
-    parts = kls.split('.')
-    module = ".".join(parts[:-1])
-    m = __import__(module)
-    for comp in parts[1:]:
-        m = getattr(m, comp)
-    return m
+def get_class(kls: str):
+    """ Dynamically import a python class from a module listing. """
+    module, name = kls.rsplit('.', 1)
+    module = import_module(module)
+    return getattr(module, name)
 
 
 def log_params(params):
+    """ Print the current parameters to the log file. """
     params = vars(params)
     for k in sorted(params.keys()):
         logger.info('{}: {}'.format(k, params[k]))
@@ -42,11 +32,11 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
     fr: FrameRateKeeper = FrameRateKeeper(max_frame_rate=args['tick_rate'])
     players: Dict[int, _Player] = {}
 
-    server_state = ServerState(env_class.__name__, env_class.observation_names())
+    server_state = ServerState(env_class.__name__, args["config"], env_class.observation_names())
     dataframe.add_one(ServerState, server_state)
     dataframe.commit()
 
-    env: BaseEnvironment = env_class()
+    env: BaseEnvironment = env_class(args["config"])
 
     logger.info("Waiting for enough players to join ({} required)...".format(env.min_players))
     while len(players) < env.min_players:
@@ -65,7 +55,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
 
     logger.info("Finalizing players and setting up new environment.")
     state, player_turns = env.new_state(num_players=len(players))
-    if args["tree_search"] and env.serializable():
+    if args["full-state"] and env.serializable():
         server_state.serialized_state = env.serialize_state(state)
 
     for i, player in enumerate(players.values()):
@@ -90,7 +80,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
         current_actions = []
         server_state = dataframe.read_one(ServerState, server_state.oid)
 
-        if args['lenient_mode'] and not all(p.ready_for_action_to_be_taken for p in current_players):
+        if not args['realtime'] and not all(p.ready_for_action_to_be_taken for p in current_players):
             continue
 
         # Queue up each players action if it is legal
@@ -109,7 +99,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
             env.next_state(state=state, players=player_turns, actions=current_actions)
         )
 
-        if args["tree_search"] and env.serializable():
+        if args["full-state"] and env.serializable():
             server_state.serialized_state = env.serialize_state(state)
 
         # Update the player data from the previous move.
@@ -156,15 +146,23 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-
-    for key, value in DEFAULT_PARAMS.items():
-        key = '--' + key.replace('_', '-')
-        parser.add_argument(key, type=type(value), default=value)
+    parser.add_argument("environment_class", type=str,
+                        help="The full module name of the environment.")
+    parser.add_argument("--config", '-c', type=str, default="",
+                        help="Config string that will be passed into the environment constructor.")
+    parser.add_argument("--port", "-p", type=int, default=7777,
+                        help="Server Port.")
+    parser.add_argument("--tick-rate", "-t", type=int, default=60,
+                        help="The tick rate that the server will run on.")
+    parser.add_argument("--realtime", "-r", action="store_true",
+                        help="With this on, the server will not wait for all of the clients to respond.")
+    parser.add_argument("--full-state", '-f', action='store_true',
+                        help="With this on, the server will also push the true state of the game to the clients.")
 
     args = parser.parse_args()
     log_params(args)
 
-    env_class: Type[BaseEnvironment] = get_class(args.env_class_name)
+    env_class: Type[BaseEnvironment] = get_class(args.environment_class)
     player_class: Type[_Player] = Player(env_class.observation_names())
 
     server_app = Application(server_app,

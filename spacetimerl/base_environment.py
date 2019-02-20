@@ -4,6 +4,15 @@ import numpy as np
 
 
 class BaseEnvironment(ABC):
+    def __init__(self, config: str = ""):
+        """
+        Parameters
+        ----------
+        config : str
+            Optional config string that will be passed into the constructor. You can use this however you like.
+            Load options from string, have it point to a file and read it, etc.
+        """
+        self._config = config
 
     @property
     @abstractmethod

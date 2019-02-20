@@ -59,14 +59,16 @@ class _Player(object):
 class ServerState(object):
     oid = primarykey(int)
     env_class_name = dimension(str)
+    env_config = dimension(str)
     env_dimensions = dimension(tuple)
     terminal = dimension(bool)
     winners = dimension(str)
     serialized_state = dimension(str)
 
-    def __init__(self, env_class_name, env_dimensions):
+    def __init__(self, env_class_name, env_config, env_dimensions):
         self.oid = random.randint(0, sys.maxsize)
         self.env_class_name = env_class_name
+        self.env_config = env_config
         self.env_dimensions = tuple(env_dimensions)
         self.terminal = False
         self.winners = ""
