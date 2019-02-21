@@ -136,8 +136,14 @@ class ClientEnv:
 
 
 def client_app(dataframe: Dataframe, app: "RLApp", client_function: Callable,
-               player_class: Type[Player], *args, **kwargs):
-    pass
+               player_class: Type[Player], dimension_names: [str], *args, **kwargs):
+
+    client_env = ClientEnv(dataframe=dataframe,
+                           dimensions=dimension_names,
+                           player_class=player_class,
+                           server_environment=app.server_environment)
+
+    client_function(client_env, *args, **kwargs)
 
 
 class RLApp:
@@ -163,7 +169,7 @@ class RLApp:
                                  dataframe=(self.host, self.port),
                                  Types=[player_class, ServerState],
                                  version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-            client.start(main_func, player_class, *args, **kwargs)
+            client.start(self, main_func, player_class, dimension_names, *args, **kwargs)
 
         return app
 
