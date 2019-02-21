@@ -5,15 +5,13 @@ import numpy as np
 import random, sys
 
 
-def Player(observation_names: List[str]):
+def Observation(observation_names: List[str]):
     """ Creates a proper player class with the attributes necessary to transfer the observations. """
-    class Player(_Player):
-        def __init__(self, name: str):
-            super().__init__(name)
+    class Observation:
+        pid = primarykey(int)
 
-        def finalize_player(self, number: int, observations: Dict[str, np.ndarray]):
-            self.number = number
-            self.set_observation(observations)
+        def __init__(self, pid: int):
+            self.pid = pid
 
         def set_observation(self, observations: Dict[str, np.ndarray]):
             for key, value in observations.items():
@@ -22,18 +20,21 @@ def Player(observation_names: List[str]):
     for name in observation_names:
         setattr(Player, name, dimension(np.array))
 
-    return pcc_set(Player)
+    return pcc_set(Observation)
 
-
-class _Player(object):
+@pcc_set
+class Player(object):
     pid = primarykey(int)
 
     number = dimension(int)
     name = dimension(str)
+    observation_port = dimension(int)
+
     action = dimension(str)
     ready_for_action_to_be_taken = dimension(bool)
     turn = dimension(bool)
     reward_from_last_turn = dimension(float)
+
     acknowledges_game_over = dimension(bool)
     winner = dimension(bool)
 
@@ -48,11 +49,9 @@ class _Player(object):
         self.acknowledges_game_over = False  # So the server can exit once it knows players got their final pull in.
         self.winner = False
 
-    def finalize_player(self, number: int, observations: Dict[str, np.ndarray]):
-        raise NotImplementedError
-
-    def set_observation(self, observations: Dict[str, np.ndarray]):
-        raise NotImplementedError
+    def finalize_player(self, number: int, observation_port: int):
+        self.number = number
+        self.observation_port = observation_port
 
 
 @pcc_set
