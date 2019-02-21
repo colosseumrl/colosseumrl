@@ -2,7 +2,7 @@
 import spacetime
 import numpy as np
 from spacetime import Dataframe, Application
-from spacetimerl.data_model import ServerState, Player, _Player
+from spacetimerl.data_model import ServerState, Player, Observation
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
 from spacetimerl.base_environment import BaseEnvironment
 
@@ -17,14 +17,16 @@ logger = logging.getLogger(__name__)
 class ClientEnv:
     TickRate = 60
 
-    def __init__(self, dataframe: Dataframe, dimensions: List[str], player_class: Type[Player],
+    def __init__(self, dataframe: Dataframe, dimensions: List[str], player_class: Type[Player], host: str,
                  server_environment: Optional[Type[BaseEnvironment]] = None):
-        self.dataframe: Dataframe = dataframe
-        self._server_state: ServerState = self.dataframe.read_all(ServerState)[0]
-        self.player: _Player = None
+        self.player_df: Dataframe = dataframe
+        self._server_state: ServerState = self.player_df.read_all(ServerState)[0]
+        self.player: Player = None
 
         self.player_class: Type[BaseEnvironment] = player_class
         self.dimensions: List[str] = dimensions
+
+        self._host = host
 
         self._server_environment: Optional[BaseEnvironment] = None
         if server_environment is not None:
@@ -33,12 +35,12 @@ class ClientEnv:
         self.fr: FrameRateKeeper = FrameRateKeeper(self.TickRate)
 
     def __pull(self):
-        self.dataframe.pull()
-        self.dataframe.checkout()
+        self.player_df.pull()
+        self.player_df.checkout()
 
     def __push(self):
-        self.dataframe.commit()
-        self.dataframe.push()
+        self.player_df.commit()
+        self.player_df.push()
 
     def __tick(self):
         self.fr.tick()
@@ -81,14 +83,14 @@ class ClientEnv:
         """ Connect to the remote server and wait for the game to start. """
         # Add this player to the game.
         self.__pull()
-        self.player: _Player = self.player_class(name=name)
-        self.dataframe.add_one(self.player_class, self.player)
+        self.player: Player = self.player_class(name=name)
+        self.player_df.add_one(self.player_class, self.player)
         self.__push()
         sleep(0.1)
 
         # Check to see if it worked.
         self.__push()
-        if self.dataframe.read_one(self.player_class, self.player.pid) is None:
+        if self.player_df.read_one(self.player_class, self.player.pid) is None:
             logger.info("Server rejected adding your player, perhaps the max player limit has been reached.")
             self.player = None
             raise ConnectionError("Could not connect to server.")
@@ -99,7 +101,21 @@ class ClientEnv:
             self.__tick()
             self.__pull()
 
-        logger.info("Game has started. We are player {}".format(self.player.number))
+        logger.info("We are player {}".format(self.player.number))
+
+        # Connect to observation dataframe
+        assert self.player.observation_port > 0
+        self.observation_df = Dataframe("{}_observation_df".format(self.player.name),
+                                        [Observation],
+                                        details=(self._host, self.player.observation_port))
+        self.observation_df.pull()
+        self._observation = self.observation_df.read_all(Observation())
+
+        # Let the server know that we are ready to start
+        self.player.ready_for_start = True
+        self.player_df.commit()
+        self.player_df.push()
+
 
     def wait_for_turn(self):
         while not self.player.turn:
@@ -136,12 +152,13 @@ class ClientEnv:
 
 
 def client_app(dataframe: Dataframe, app: "RLApp", client_function: Callable,
-               player_class: Type[Player], dimension_names: [str], *args, **kwargs):
+               player_class: Type[Player], dimension_names: [str], host, *args, **kwargs):
 
     client_env = ClientEnv(dataframe=dataframe,
                            dimensions=dimension_names,
                            player_class=player_class,
-                           server_environment=app.server_environment)
+                           server_environment=app.server_environment,
+                           host=host)
 
     client_function(client_env, *args, **kwargs)
 
@@ -169,7 +186,7 @@ class RLApp:
                                  dataframe=(self.host, self.port),
                                  Types=[player_class, ServerState],
                                  version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-            client.start(self, main_func, player_class, dimension_names, *args, **kwargs)
+            client.start(self, main_func, player_class, dimension_names, self.host, *args, **kwargs)
 
         return app
 

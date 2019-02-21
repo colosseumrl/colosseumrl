@@ -49,6 +49,8 @@ class Player(object):
         self.reward_from_last_turn = -1.0
         self.acknowledges_game_over = False  # So the server can exit once it knows players got their final pull in.
         self.winner = False
+        self.ready_for_start = False
+        self.observation_port = -1
 
     def finalize_player(self, number: int, observation_port: int):
         self.number = number
