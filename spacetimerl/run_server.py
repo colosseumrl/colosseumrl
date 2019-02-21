@@ -2,14 +2,14 @@ import argparse
 import pickle
 
 import spacetime
-from spacetime import Application
-from spacetimerl.data_model import Player, ServerState, _Player
+from spacetime import Application, Dataframe
+from spacetimerl.data_model import ServerState, Player, _Observation, Observation
 from spacetimerl.rl_logging import init_logging
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
 from spacetimerl.base_environment import BaseEnvironment
 
 from importlib import import_module
-from typing import Type, Dict
+from typing import Type, Dict, List
 
 logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
@@ -28,14 +28,28 @@ def log_params(params):
         logger.info('{}: {}'.format(k, params[k]))
 
 
-def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment], player_class: Type[_Player], args: dict):
+def server_app(dataframe: spacetime.Dataframe,
+               env_class: Type[BaseEnvironment],
+               observation_type: Type,
+               args: dict):
     fr: FrameRateKeeper = FrameRateKeeper(max_frame_rate=args['tick_rate'])
-    players: Dict[int, _Player] = {}
 
+    # Keep track of each player and their associated observations
+    observation_dataframes: Dict[int, Dataframe] = {}
+    observations: Dict[int, _Observation] = {}
+    players: Dict[int, Player] = {}
+
+    # Function to help push all observations
+    def push_observations():
+        for df in observation_dataframes.values():
+            df.commit()
+
+    # Add the server state to the master dataframe
     server_state = ServerState(env_class.__name__, args["config"], env_class.observation_names())
     dataframe.add_one(ServerState, server_state)
     dataframe.commit()
 
+    # Create the environment and start the server
     env: BaseEnvironment = env_class(args["config"])
 
     logger.info("Waiting for enough players to join ({} required)...".format(env.min_players))
@@ -43,29 +57,56 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
         fr.tick()
         dataframe.sync()
 
-        new_players: Dict[int, _Player] = dict((p.pid, p) for p in dataframe.read_all(player_class))
+        new_players: Dict[int, Player] = dict((p.pid, p) for p in dataframe.read_all(Player))
 
         for new_id in new_players.keys() - players.keys():
             logger.info("New player joined with name: {}".format(new_players[new_id].name))
 
+            # Create new observation dataframe for the new player
+            obs_df = Dataframe("{}_observation".format(new_players[new_id].name), [observation_type])
+            obs = observation_type(new_id)
+            obs_df.add_one(observation_type, obs)
+
+            # Add the dataframes to the database
+            observation_dataframes[new_id] = obs_df
+            observations[new_id] = obs
+
         for remove_id in players.keys() - new_players.keys():
             logger.info("Player {} has left.".format(players[remove_id].name))
+            del observations[remove_id]
+            del observation_dataframes[remove_id]
 
         players = new_players
 
     logger.info("Finalizing players and setting up new environment.")
+
+    # Create the inital state for the environment and push it if enabled
     state, player_turns = env.new_state(num_players=len(players))
-    if args["full-state"] and env.serializable():
+    if args["full_state"] and env.serializable():
         server_state.serialized_state = env.serialize_state(state)
 
-    for i, player in enumerate(players.values()):
-        player.finalize_player(number=i, observations=env.state_to_observation(state=state, player=i))
+    # Set up each player
+    for i, (pid, player) in enumerate(players.items()):
+        # Add the initial observation to each player
+        observations[pid].set_observation(env.state_to_observation(state=state, player=i))
+
+        # Finalize each player by giving it a player number and a port for the dataframe
+        player.finalize_player(number=i, observation_port=observation_dataframes[pid].details[1])
         if i in player_turns:
             player.turn = True
 
-    players_by_number: Dict[int, _Player] = dict((p.number, p) for p in players.values())
+    # Push all of the results to the player
+    players_by_number: Dict[int, Player] = dict((p.number, p) for p in players.values())
+    push_observations()
     dataframe.sync()
 
+    # Wait for all players to be ready
+    # TODO: Add timeout to this
+    while not all(player.ready_for_start for player in players.values()):
+        dataframe.checkout()
+        fr.tick()
+
+    # Start the game
     terminal = False
     turn_count = 0
     while not terminal:
@@ -76,9 +117,8 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
         dataframe.checkout()
 
         # Get the player dataframes of the players whos turn it is right now
-        current_players = [p for p in players.values() if p.number in player_turns]
-        current_actions = []
-        server_state = dataframe.read_one(ServerState, server_state.oid)
+        current_players: List[Player] = [p for p in players.values() if p.number in player_turns]
+        current_actions: List[str] = []
 
         if not args['realtime'] and not all(p.ready_for_action_to_be_taken for p in current_players):
             continue
@@ -99,7 +139,8 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
             env.next_state(state=state, players=player_turns, actions=current_actions)
         )
 
-        if args["full-state"] and env.serializable():
+        # Update true state if enabled
+        if args["full_state"] and env.serializable():
             server_state.serialized_state = env.serialize_state(state)
 
         # Update the player data from the previous move.
@@ -111,7 +152,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
         # Tell the new players that its their turn and provide observation
         for player_number in player_turns:
             player = players_by_number[player_number]
-            player.set_observation(env.state_to_observation(state=state, player=player_number))
+            observations[player.pid].set_observation(env.state_to_observation(state=state, player=player_number))
             player.turn = True
 
         if terminal:
@@ -122,9 +163,10 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
             logger.info("Player: {} won the game.".format(winners))
 
         turn_count += 1
+        push_observations()
         dataframe.commit()
 
-    for player in dataframe.read_all(player_class):
+    for player in dataframe.read_all(Player):
         player.turn = True
 
     dataframe.commit()
@@ -135,7 +177,7 @@ def server_app(dataframe: spacetime.Dataframe, env_class: Type[BaseEnvironment],
     # TODO| players would have a similar error when the server would quit while they are pulling.
     # TODO| May need to talk to Rohan about cleanly exiting this kind of situation.
     # TODO| It would also be great if we could instead properly confirm that recipients got a message.
-    for player in dataframe.read_all(player_class):
+    for player in dataframe.read_all(Player):
         while not player.acknowledges_game_over:
             fr.tick()
             dataframe.checkout()
@@ -163,10 +205,10 @@ if __name__ == '__main__':
     log_params(args)
 
     env_class: Type[BaseEnvironment] = get_class(args.environment_class)
-    player_class: Type[_Player] = Player(env_class.observation_names())
+    observation_type: Type[_Observation] = Observation(env_class.observation_names())
 
     server_app = Application(server_app,
                              server_port=args.port,
-                             Types=[player_class, ServerState],
+                             Types=[Player, ServerState],
                              version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-    server_app.start(env_class, player_class, vars(args))
+    server_app.start(env_class, observation_type, vars(args))

@@ -11,7 +11,7 @@ def Observation(observation_names: List[str]):
         pass
 
     for name in observation_names:
-        setattr(Player, name, dimension(np.array))
+        setattr(Observation, name, dimension(np.array))
 
     return pcc_set(Observation)
 

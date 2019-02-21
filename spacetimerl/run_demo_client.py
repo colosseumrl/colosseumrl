@@ -1,15 +1,13 @@
-from spacetimerl.client_network_env import ClientNetworkEnv
 from spacetimerl.rl_logging import init_logging
+from spacetimerl.client_environment import RLApp, ClientEnv
 
 import numpy as np
 
-if __name__ == '__main__':
+@RLApp("localhost", 7777)
+def main(ce: ClientEnv):
     logger = init_logging()
-
-    ce = ClientNetworkEnv(server_hostname="localhost", port=7777,
-                          player_name="Xxsome_player_{}xX".format(np.random.randint(0, 500)))
-
-    logger.debug("First observation: {}".format(ce.get_first_observation()))
+    ce.connect("player_{}".format(np.random.randint(0, 1024)))
+    logger.debug("First observation: {}".format(ce.wait_for_turn()))
 
     last_reward = -100
     action_delta = -1
@@ -28,4 +26,5 @@ if __name__ == '__main__':
         action += action_delta
         last_reward = reward
 
-    ce.close()
+if __name__ == '__main__':
+    main()
