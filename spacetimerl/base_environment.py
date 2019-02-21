@@ -120,6 +120,6 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @staticmethod
-    def unserialize_state(serialized_state: str) -> object:
+    def deserialize_state(serialized_state: str) -> object:
         """ Convert the serialized string back into a proper state. """
         raise NotImplementedError

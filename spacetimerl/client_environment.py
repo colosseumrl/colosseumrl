@@ -17,13 +17,17 @@ logger = logging.getLogger(__name__)
 class ClientEnv:
     TickRate = 60
 
-    def __init__(self, dataframe: Dataframe, dimensions: List[str], player_class: Type[Player], host: str,
+    def __init__(self, dataframe: Dataframe, dimensions: List[str], observation_class: Type[Observation], host: str,
                  server_environment: Optional[Type[BaseEnvironment]] = None):
-        self.player_df: Dataframe = dataframe
-        self._server_state: ServerState = self.player_df.read_all(ServerState)[0]
-        self.player: Player = None
 
-        self.player_class: Type[BaseEnvironment] = player_class
+        self.player_df: Dataframe = dataframe
+        self.observation_df: Dataframe = None
+
+        self._server_state: ServerState = self.player_df.read_all(ServerState)[0]
+        self._player: Player = None
+        self._observation: Type[Observation] = None
+
+        self._observation_class: Type[Observation] = observation_class
         self.dimensions: List[str] = dimensions
 
         self._host = host
@@ -38,6 +42,10 @@ class ClientEnv:
         self.player_df.pull()
         self.player_df.checkout()
 
+        if self.observation_df is not None:
+            self.observation_df.pull()
+            self.observation_df.checkout()
+
     def __push(self):
         self.player_df.commit()
         self.player_df.push()
@@ -48,10 +56,10 @@ class ClientEnv:
     @property
     def observation(self) -> Dict[str, np.ndarray]:
         """ Current Observation for this player. """
-        if self.player is None:
+        if self._observation is None:
             raise ConnectionError("Not connected to server")
 
-        return {dimension: getattr(self.player, dimension) for dimension in self.dimensions}
+        return {dimension: getattr(self._observation, dimension) for dimension in self.dimensions}
 
     @property
     def server_state(self) -> ServerState:
@@ -74,51 +82,53 @@ class ClientEnv:
 
     @property
     def full_state(self):
-        """ Full serer state for the game if the environment and the server support it. """
+        """ Full server state for the game if the environment and the server support it. """
         if not self.server_environment.serializable():
             raise ValueError("Current Environment does not support full state for clients.")
-        return self.server_environment.unserialize_state(self.server_state.serialized_state)
+        return self.server_environment.deserialize_state(self.server_state.serialized_state)
 
     def connect(self, name: str):
         """ Connect to the remote server and wait for the game to start. """
         # Add this player to the game.
         self.__pull()
-        self.player: Player = self.player_class(name=name)
-        self.player_df.add_one(self.player_class, self.player)
+        self._player: Player = Player(name=name)
+        self.player_df.add_one(Player, self._player)
         self.__push()
         sleep(0.1)
 
-        # Check to see if it worked.
+        # Check to see if adding our Player object to the dataframe worked.
         self.__push()
-        if self.player_df.read_one(self.player_class, self.player.pid) is None:
+        if self.player_df.read_one(Player, self._player.pid) is None:
             logger.info("Server rejected adding your player, perhaps the max player limit has been reached.")
-            self.player = None
+            self._player = None
             raise ConnectionError("Could not connect to server.")
-        logger.info("Connected to server, waiting for game to start...")
 
         # Wait for game to start
-        while self.player.number == -1:
+        while self._player.number == -1:
             self.__tick()
             self.__pull()
 
-        logger.info("We are player {}".format(self.player.number))
+        logger.info("We are player number {}".format(self._player.number))
 
-        # Connect to observation dataframe
-        assert self.player.observation_port > 0
-        self.observation_df = Dataframe("{}_observation_df".format(self.player.name),
-                                        [Observation],
-                                        details=(self._host, self.player.observation_port))
-        self.observation_df.pull()
-        self._observation = self.observation_df.read_all(Observation())
+        # Connect to observation dataframe, and get the initial observation.
+        assert self._player.observation_port > 0
+        self.observation_df = Dataframe("{}_observation_df".format(self._player.name),
+                                        [self._observation_class],
+                                        details=(self._host, self._player.observation_port))
+        self.__pull()
+        self._observation = self.observation_df.read_all(self._observation_class)[0]
 
-        # Let the server know that we are ready to start
-        self.player.ready_for_start = True
-        self.player_df.commit()
-        self.player_df.push()
+        # Make sure that our observation has the dimensions we were expecting.
+        assert all([hasattr(self._observation, dimension) for dimension in self.dimensions])
 
+        # Let the server know that we are ready to start.
+        self._player.ready_for_start = True
+        self.__push()
+
+        logger.info("Connected to server, ready for it to be player's turn.")
 
     def wait_for_turn(self):
-        while not self.player.turn:
+        while not self._player.turn:
             self.__tick()
             self.__pull()
 
@@ -126,20 +136,20 @@ class ClientEnv:
 
     def step(self, action: str):
         if not self.server_state.terminal:
-            self.player.action = action
-            self.player.ready_for_action_to_be_taken = True
+            self._player.action = action
+            self._player.ready_for_action_to_be_taken = True
             self.__push()
 
-            while not self.player.turn or self.player.ready_for_action_to_be_taken:
+            while not self._player.turn or self._player.ready_for_action_to_be_taken:
                 self.__tick()
                 self.__pull()
 
-        reward = self.player.reward_from_last_turn
+        reward = self._player.reward_from_last_turn
         terminal = self.terminal
 
         if terminal:
             winners = pickle.loads(self.server_state.winners)
-            self.player.acknowledges_game_over = True
+            self._player.acknowledges_game_over = True
             self.__push()
         else:
             winners = None
@@ -150,13 +160,12 @@ class ClientEnv:
         print("No render defined for default client environment")
 
 
-
 def client_app(dataframe: Dataframe, app: "RLApp", client_function: Callable,
-               player_class: Type[Player], dimension_names: [str], host, *args, **kwargs):
+               observation_class: Type[Observation], dimension_names: [str], host, *args, **kwargs):
 
     client_env = ClientEnv(dataframe=dataframe,
                            dimensions=dimension_names,
-                           player_class=player_class,
+                           observation_class=observation_class,
                            server_environment=app.server_environment,
                            host=host)
 
@@ -178,15 +187,15 @@ class RLApp:
         df.pull()
         df.checkout()
         dimension_names: [str] = df.read_all(ServerState)[0].env_dimensions
-        player_class = Player(dimension_names)
+        observation_class = Observation(dimension_names)
         del df
 
         def app(*args, **kwargs):
             client = Application(client_app,
                                  dataframe=(self.host, self.port),
-                                 Types=[player_class, ServerState],
+                                 Types=[Player, observation_class, ServerState],
                                  version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-            client.start(self, main_func, player_class, dimension_names, self.host, *args, **kwargs)
+            client.start(self, main_func, observation_class, dimension_names, self.host, *args, **kwargs)
 
         return app
 

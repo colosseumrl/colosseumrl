@@ -145,8 +145,8 @@ def turn_based_environment(cls):
             return cls.serialize_state(state)
 
         @staticmethod
-        def unserialize_state(serialized_state: str):
-            return cls.unserialize_state(serialized_state)
+        def deserialize_state(serialized_state: str):
+            return cls.deserialize_state(serialized_state)
 
     return TurnBasedWrapper
 
