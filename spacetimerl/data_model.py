@@ -31,6 +31,7 @@ class Player(object):
     observation_port = dimension(int)
 
     action = dimension(str)
+    ready_for_start = dimension(bool)
     ready_for_action_to_be_taken = dimension(bool)
     turn = dimension(bool)
     reward_from_last_turn = dimension(float)
