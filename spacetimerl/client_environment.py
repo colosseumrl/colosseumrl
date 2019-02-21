@@ -38,6 +38,8 @@ class ClientEnv:
 
         self.fr: FrameRateKeeper = FrameRateKeeper(self.TickRate)
 
+        self.is_connected = False
+
     def __pull(self):
         self.player_df.pull()
         self.player_df.checkout()
@@ -69,11 +71,13 @@ class ClientEnv:
     @property
     def terminal(self) -> bool:
         """ Whether the game is over or not. """
+        assert self.is_connected
         return self.server_state.terminal
 
     @property
     def winners(self) -> Optional[List[int]]:
         """ The winners of the game. """
+        assert self.is_connected
         return pickle.loads(self.server_state.winners)
 
     @property
@@ -125,9 +129,12 @@ class ClientEnv:
         self._player.ready_for_start = True
         self.__push()
 
+        self.is_connected = True
         logger.info("Connected to server, ready for it to be player's turn.")
 
     def wait_for_turn(self):
+        assert self.is_connected
+
         while not self._player.turn:
             self.__tick()
             self.__pull()
@@ -135,6 +142,8 @@ class ClientEnv:
         return self.observation
 
     def step(self, action: str):
+        assert self.is_connected
+
         if not self.server_state.terminal:
             self._player.action = action
             self._player.ready_for_action_to_be_taken = True
