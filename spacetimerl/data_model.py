@@ -7,20 +7,24 @@ import random, sys
 
 def Observation(observation_names: List[str]):
     """ Creates a proper player class with the attributes necessary to transfer the observations. """
-    class Observation:
-        pid = primarykey(int)
-
-        def __init__(self, pid: int):
-            self.pid = pid
-
-        def set_observation(self, observations: Dict[str, np.ndarray]):
-            for key, value in observations.items():
-                self.__setattr__(key, value)
+    class Observation(_Observation):
+        pass
 
     for name in observation_names:
         setattr(Player, name, dimension(np.array))
 
     return pcc_set(Observation)
+
+
+class _Observation:
+    pid = primarykey(int)
+
+    def __init__(self, pid: int):
+        self.pid = pid
+
+    def set_observation(self, observations: Dict[str, np.ndarray]):
+        for key, value in observations.items():
+            self.__setattr__(key, value)
 
 @pcc_set
 class Player(object):
