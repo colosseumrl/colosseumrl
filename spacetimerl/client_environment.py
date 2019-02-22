@@ -91,7 +91,7 @@ class ClientEnv:
             raise ValueError("Current Environment does not support full state for clients.")
         return self.server_environment.deserialize_state(self.server_state.serialized_state)
 
-    def connect(self, name: str):
+    def connect(self, name: str) -> int:
         """ Connect to the remote server and wait for the game to start. """
         # Add this player to the game.
         self.__pull()
@@ -132,6 +132,8 @@ class ClientEnv:
         self.is_connected = True
         logger.info("Connected to server, ready for it to be player's turn.")
 
+        return self._player.number
+
     def wait_for_turn(self):
         assert self.is_connected
 
@@ -165,14 +167,11 @@ class ClientEnv:
 
         return self.observation, reward, terminal, winners
 
-    def render(self):
-        print("No render defined for default client environment")
-
 
 def client_app(dataframe: Dataframe, app: "RLApp", client_function: Callable,
                observation_class: Type[Observation], dimension_names: [str], host, *args, **kwargs):
 
-    client_env = ClientEnv(dataframe=dataframe,
+    client_env = app.client_environment(dataframe=dataframe,
                            dimensions=dimension_names,
                            observation_class=observation_class,
                            server_environment=app.server_environment,

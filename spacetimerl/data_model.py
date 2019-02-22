@@ -69,7 +69,7 @@ class ServerState(object):
     env_dimensions = dimension(tuple)
     terminal = dimension(bool)
     winners = dimension(str)
-    serialized_state = dimension(str)
+    serialized_state = dimension(bytes)
 
     def __init__(self, env_class_name, env_config, env_dimensions):
         self.oid = random.randint(0, sys.maxsize)
@@ -78,4 +78,4 @@ class ServerState(object):
         self.env_dimensions = tuple(env_dimensions)
         self.terminal = False
         self.winners = ""
-        self.serialized_state = ""
+        self.serialized_state = b""

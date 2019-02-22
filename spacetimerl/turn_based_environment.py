@@ -44,21 +44,21 @@ class TurnBasedEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def next_state(self, state: object, player: int, action: str) \
+    def next_state(self, state: object, player_num: int, action: str) \
             -> Tuple[object, float, bool, Union[List[int], None]]:
         raise NotImplementedError
 
     @abstractmethod
-    def valid_actions(self, state: object, player: int) -> [str]:
+    def valid_actions(self, state: object, player_num: int) -> [str]:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
     @abstractmethod
-    def is_valid_action(self, state: object, player: int, action: str) -> bool:
+    def is_valid_action(self, state: object, player_num: int, action: str) -> bool:
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
-    def state_to_observation(self, state: object, player: int) -> Dict[str, np.ndarray]:
+    def state_to_observation(self, state: object, player_num: int) -> Dict[str, np.ndarray]:
         """ Convert the raw game state to the observation for the agent. Maps each observation name into an observation.
 
         This can return different values for the different players. Default implementation is just the identity."""
@@ -86,7 +86,7 @@ class TurnBasedEnvironment(ABC):
 def turn_based_environment(cls):
     class TurnBasedWrapper(BaseEnvironment):
         def __init__(self, *args, **kwargs):
-            self.base = cls(*args, **kwargs)
+            self.base = cls()
 
         @property
         def min_players(self) -> int:
