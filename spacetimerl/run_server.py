@@ -207,8 +207,11 @@ if __name__ == '__main__':
     env_class: Type[BaseEnvironment] = get_class(args.environment_class)
     observation_type: Type[_Observation] = Observation(env_class.observation_names())
 
-    server_app = Application(server_app,
-                             server_port=args.port,
-                             Types=[Player, ServerState],
-                             version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
-    server_app.start(env_class, observation_type, vars(args))
+    while True:
+        app = Application(server_app,
+                                 server_port=args.port,
+                                 Types=[Player, ServerState],
+                                 version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
+        app.start(env_class, observation_type, vars(args))
+        del app
+

@@ -6,7 +6,7 @@ from spacetimerl.data_model import ServerState, Player, Observation
 from spacetimerl.frame_rate_keeper import FrameRateKeeper
 from spacetimerl.base_environment import BaseEnvironment
 
-from time import sleep
+from time import sleep, time
 from typing import Callable, Type, Optional, List, Dict
 import pickle
 import logging
@@ -183,15 +183,26 @@ def client_app(dataframe: Dataframe, app: "RLApp", client_function: Callable,
 class RLApp:
     def __init__(self, host: str, port: int,
                  client_environment: Type[ClientEnv] = ClientEnv,
-                 server_environment: Optional[Type[BaseEnvironment]] = None):
+                 server_environment: Optional[Type[BaseEnvironment]] = None,
+                 time_out: int = 0):
         self.client_environment = client_environment
         self.server_environment = server_environment
         self.host = host
         self.port = port
+        self.time_out = time_out
 
     def __call__(self, main_func: Callable):
         # Get the dimensions required for the player dataframe
-        df = Dataframe("dimension_getter", [ServerState], details=(self.host, self.port))
+        start_time = time()
+        while True:
+            try:
+                df = Dataframe("dimension_getter", [ServerState], details=(self.host, self.port))
+            except ConnectionRefusedError as e:
+                if (time() - start_time) > self.time_out:
+                    raise e
+            else:
+                break
+
         df.pull()
         df.checkout()
         dimension_names: [str] = df.read_all(ServerState)[0].env_dimensions
