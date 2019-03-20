@@ -101,11 +101,11 @@ class BaseEnvironment(ABC):
         """ Valid actions for a specific state. """
         raise NotImplementedError
 
+    @abstractmethod
     def state_to_observation(self, state: object, player: int) -> Dict[str, np.ndarray]:
         """ Convert the raw game state to the observation for the agent. Maps each observation name into an observation.
 
         This can return different values for the different players. Default implementation is just the identity."""
-        return {'state': np.array(state)}
 
     # Serialization Methods
     @staticmethod

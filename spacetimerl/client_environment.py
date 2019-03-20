@@ -1,4 +1,3 @@
-# WIP
 import spacetime
 import numpy as np
 from spacetime import Dataframe, Application
@@ -92,7 +91,17 @@ class ClientEnv:
         return self.server_environment.deserialize_state(self.server_state.serialized_state)
 
     def connect(self, name: str) -> int:
-        """ Connect to the remote server and wait for the game to start. """
+        """ Connect to the remote server and wait for the game to start.
+
+        Parameters
+        ----------
+        name: str
+            Your desired Player Name.
+
+        Returns
+        -------
+        player_number: int
+        """
         # Add this player to the game.
         self.__pull()
         self._player: Player = Player(name=name)
@@ -135,6 +144,13 @@ class ClientEnv:
         return self._player.number
 
     def wait_for_turn(self):
+        """ Wait for your turn. This is usually only used in the beginning of the game.
+
+        Returns
+        -------
+        observation:
+            The observation after the wait.
+        """
         assert self.is_connected
 
         while not self._player.turn:
@@ -143,7 +159,34 @@ class ClientEnv:
 
         return self.observation
 
+    def valid_action(self):
+        """ Get a list of all valid moves for the current state.
+
+        Returns
+        -------
+        moves: list[str]
+        """
+        if self._server_environment is not None:
+            return self._server_environment.valid_actions(self.full_state, self._player.number)
+        else:
+            raise NotImplementedError("No valid_action is implemented in this client and "
+                                      "we do not have access to the full server environment")
+
     def step(self, action: str):
+        """ Perform an action and send it to the server. This wil block until it is your turn again.
+
+        Parameters
+        ----------
+        action: str
+            Your action string.
+
+        Returns
+        -------
+        observation
+        reward
+        terminal
+        winners
+        """
         assert self.is_connected
 
         if not self.server_state.terminal:
