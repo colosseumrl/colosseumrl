@@ -68,6 +68,7 @@ class ServerState(object):
     env_config = dimension(str)
     env_dimensions = dimension(tuple)
     terminal = dimension(bool)
+    server_no_longer_joinable = dimension(bool)
     winners = dimension(str)
     serialized_state = dimension(bytes)
 
@@ -77,5 +78,6 @@ class ServerState(object):
         self.env_config = env_config
         self.env_dimensions = tuple(env_dimensions)
         self.terminal = False
+        self.server_no_longer_joinable = False
         self.winners = ""
         self.serialized_state = b""

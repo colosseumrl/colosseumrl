@@ -6,6 +6,7 @@ from spacetimerl.frame_rate_keeper import FrameRateKeeper
 from spacetimerl.base_environment import BaseEnvironment
 
 from time import sleep, time
+import struct
 from typing import Callable, Type, Optional, List, Dict
 import pickle
 import logging
@@ -23,6 +24,12 @@ class ClientEnv:
         self.observation_df: Dataframe = None
 
         self._server_state: ServerState = self.player_df.read_all(ServerState)[0]
+
+        assert self._server_state.terminal == False
+        print("Server joinable state: {}".format(self._server_state.server_no_longer_joinable))
+        assert self._server_state.server_no_longer_joinable == False
+
+
         self._player: Player = None
         self._observation: Type[Observation] = None
 
@@ -112,7 +119,7 @@ class ClientEnv:
         # Check to see if adding our Player object to the dataframe worked.
         self.__push()
         if self.player_df.read_one(Player, self._player.pid) is None:
-            logger.info("Server rejected adding your player, perhaps the max player limit has been reached.")
+            logger.error("Server rejected adding your player, perhaps the max player limit has been reached.")
             self._player = None
             raise ConnectionError("Could not connect to server.")
 
@@ -121,7 +128,7 @@ class ClientEnv:
             self.__tick()
             self.__pull()
 
-        logger.info("We are player number {}".format(self._player.number))
+        # logger.info("We are player number {}".format(self._player.number))
 
         # Connect to observation dataframe, and get the initial observation.
         assert self._player.observation_port > 0
@@ -139,7 +146,7 @@ class ClientEnv:
         self.__push()
 
         self.is_connected = True
-        logger.info("Connected to server, ready for it to be player's turn.")
+        # logger.info("Connected to server, ready for it to be player's turn.")
 
         return self._player.number
 
@@ -237,17 +244,34 @@ class RLApp:
     def __call__(self, main_func: Callable):
         # Get the dimensions required for the player dataframe
         start_time = time()
-        while True:
-            try:
-                df = Dataframe("dimension_getter", [ServerState], details=(self.host, self.port))
-            except ConnectionRefusedError as e:
-                if (time() - start_time) > self.time_out:
-                    raise e
-            else:
-                break
 
-        df.pull()
-        df.checkout()
+        while True:
+
+            try:
+
+                while True:
+                    try:
+                        df = Dataframe("dimension_getter", [ServerState], details=(self.host, self.port))
+                    except ConnectionRefusedError as e:
+                        if (time() - start_time) > self.time_out:
+                            raise e
+                    else:
+                        break
+
+                df.pull()
+                df.checkout()
+
+                if df.read_all(ServerState)[0].server_no_longer_joinable == True:
+                    # This server is from an old game and just hasn't exited yet, wait for a new server.
+                    sleep(0.1)
+                    continue
+                else:
+                    break
+
+            except (ConnectionResetError, struct.error):
+                sleep(0.1)
+                continue
+
         dimension_names: [str] = df.read_all(ServerState)[0].env_dimensions
         observation_class = Observation(dimension_names)
         del df

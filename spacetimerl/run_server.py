@@ -108,6 +108,10 @@ def server_app(dataframe: spacetime.Dataframe,
 
     # Start the game
     terminal = False
+
+    server_state.server_no_longer_joinable = True
+    dataframe.commit()
+
     turn_count = 0
     while not terminal:
         # Wait for a frame to tick
