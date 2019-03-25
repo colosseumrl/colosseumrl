@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class ClientEnv:
-    TickRate = 60
+    _TickRate = 60
 
     def __init__(self, dataframe: Dataframe, dimensions: List[str], observation_class: Type[Observation], host: str,
                  server_environment: Optional[Type[BaseEnvironment]] = None):
@@ -42,7 +42,7 @@ class ClientEnv:
         if server_environment is not None:
             self._server_environment = server_environment(self._server_state.env_config)
 
-        self.fr: FrameRateKeeper = FrameRateKeeper(self.TickRate)
+        self.fr: FrameRateKeeper = FrameRateKeeper(self._TickRate)
 
         self.is_connected = False
 
@@ -70,21 +70,16 @@ class ClientEnv:
         return {dimension: getattr(self._observation, dimension) for dimension in self.dimensions}
 
     @property
-    def server_state(self) -> ServerState:
-        """ Current full server state. """
-        return self._server_state
-
-    @property
     def terminal(self) -> bool:
         """ Whether the game is over or not. """
         assert self.is_connected
-        return self.server_state.terminal
+        return self._server_state.terminal
 
     @property
     def winners(self) -> Optional[List[int]]:
         """ The winners of the game. """
         assert self.is_connected
-        return pickle.loads(self.server_state.winners)
+        return pickle.loads(self._server_state.winners)
 
     @property
     def server_environment(self) -> BaseEnvironment:
@@ -95,7 +90,7 @@ class ClientEnv:
         """ Full server state for the game if the environment and the server support it. """
         if not self.server_environment.serializable():
             raise ValueError("Current Environment does not support full state for clients.")
-        return self.server_environment.deserialize_state(self.server_state.serialized_state)
+        return self.server_environment.deserialize_state(self._server_state.serialized_state)
 
     def connect(self, name: str) -> int:
         """ Connect to the remote server and wait for the game to start.
@@ -151,12 +146,12 @@ class ClientEnv:
         return self._player.number
 
     def wait_for_turn(self):
-        """ Wait for your turn. This is usually only used in the beginning of the game.
+        """ Block until it is your turn. This is usually only used in the beginning of the game.
 
         Returns
         -------
         observation:
-            The observation after the wait.
+            The player's observation once its turn has arrived.
         """
         assert self.is_connected
 
@@ -166,7 +161,7 @@ class ClientEnv:
 
         return self.observation
 
-    def valid_action(self):
+    def valid_actions(self):
         """ Get a list of all valid moves for the current state.
 
         Returns
@@ -196,7 +191,7 @@ class ClientEnv:
         """
         assert self.is_connected
 
-        if not self.server_state.terminal:
+        if not self._server_state.terminal:
             self._player.action = action
             self._player.ready_for_action_to_be_taken = True
             self.__push()
@@ -209,7 +204,7 @@ class ClientEnv:
         terminal = self.terminal
 
         if terminal:
-            winners = pickle.loads(self.server_state.winners)
+            winners = pickle.loads(self._server_state.winners)
             self._player.acknowledges_game_over = True
             self.__push()
         else:

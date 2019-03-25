@@ -4,6 +4,7 @@ import numpy as np
 
 
 class BaseEnvironment(ABC):
+
     def __init__(self, config: str = ""):
         """
         Parameters
@@ -39,7 +40,7 @@ class BaseEnvironment(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def new_state(self, num_players: int = 1) -> Tuple[object, List[int]]:
+    def new_state(self, num_players: int = None) -> Tuple[object, List[int]]:
         """ Create a fresh state. This could return a fixed object or randomly initialized on, depending on the game.
 
         Returns
@@ -110,16 +111,15 @@ class BaseEnvironment(ABC):
     # Serialization Methods
     @staticmethod
     def serializable() -> bool:
-        """ Whether or not this class supports serialization of the state.
-            This is necessary to allow the client to perform tree search. """
+        """ Whether or not this class supports serialization of the state."""
         return False
 
     @staticmethod
-    def serialize_state(state: object) -> str:
-        """ Serialize the state and convert it to a string to be sent between the clients. """
+    def serialize_state(state: object) -> bytearray:
+        """ Serialize a game state and convert it to a bytearray to be saved or sent over a network. """
         raise NotImplementedError
 
     @staticmethod
-    def deserialize_state(serialized_state: str) -> object:
-        """ Convert the serialized string back into a proper state. """
+    def deserialize_state(serialized_state: bytearray) -> object:
+        """ Convert a serialized bytearray back into a game state. """
         raise NotImplementedError
