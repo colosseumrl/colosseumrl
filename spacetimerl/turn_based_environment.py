@@ -156,6 +156,9 @@ def turn_based_environment(cls):
         def deserialize_state(serialized_state: bytearray):
             return cls.deserialize_state(serialized_state)
 
+        def __getattr__(self, attr):
+            return getattr(self.base, attr)
+
     return TurnBasedWrapper
 
 
