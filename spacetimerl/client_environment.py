@@ -261,7 +261,7 @@ class RLApp:
                 df.pull()
                 df.checkout()
 
-                if df.read_all(ServerState)[0].server_no_longer_joinable == True:
+                if df.read_all(ServerState)[0].server_no_longer_joinable:
                     # This server is from an old game and just hasn't exited yet, wait for a new server.
                     sleep(0.1)
                     continue

@@ -26,5 +26,6 @@ def main(ce: ClientEnv):
         action += action_delta
         last_reward = reward
 
+
 if __name__ == '__main__':
     main()

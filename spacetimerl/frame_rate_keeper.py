@@ -5,7 +5,7 @@ class FrameRateKeeper:
 
     def __init__(self, max_frame_rate):
         self.max_frame_rate = max_frame_rate
-        self.max_frame_time = 1.0 / 60.0
+        self.max_frame_time = 1.0 / max_frame_rate
         self.frame_start_time = time.time()
 
     def tick(self):
