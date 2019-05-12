@@ -1,1 +1,1 @@
-SpaceTimeRL
+rl-competition
