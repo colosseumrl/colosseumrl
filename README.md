@@ -1,1 +1,1 @@
-rl-competition
+rlcompetition
