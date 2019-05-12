@@ -1,6 +1,6 @@
 from typing import Tuple, List, Union, Dict
 import numpy as np
-from spacetimerl.base_environment import BaseEnvironment
+from .base_environment import BaseEnvironment
 
 
 class TestGame(BaseEnvironment):

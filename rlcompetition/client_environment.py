@@ -1,9 +1,9 @@
 import spacetime
 import numpy as np
-from spacetime import Dataframe, Application
-from spacetimerl.data_model import ServerState, Player, Observation
-from spacetimerl.frame_rate_keeper import FrameRateKeeper
-from spacetimerl.base_environment import BaseEnvironment
+from spacetime import Dataframe, Node
+from .data_model import ServerState, Player, Observation
+from .frame_rate_keeper import FrameRateKeeper
+from .base_environment import BaseEnvironment
 
 from time import sleep, time
 import struct
@@ -272,10 +272,9 @@ class RLApp:
         del df
 
         def app(*args, **kwargs):
-            client = Application(client_app,
+            client = Node(client_app,
                                  dataframe=(self.host, self.port),
-                                 Types=[Player, observation_class, ServerState],
-                                 version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
+                                 Types=[Player, observation_class, ServerState])
             client.start(self, main_func, observation_class, dimension_names, self.host, *args, **kwargs)
 
         return app

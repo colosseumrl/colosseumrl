@@ -2,14 +2,21 @@ import argparse
 import pickle
 
 import spacetime
-from spacetime import Application, Dataframe
-from spacetimerl.data_model import ServerState, Player, _Observation, Observation
-from spacetimerl.rl_logging import init_logging
-from spacetimerl.frame_rate_keeper import FrameRateKeeper
-from spacetimerl.base_environment import BaseEnvironment
+from spacetime import Node, Dataframe
+
+from .data_model import ServerState, Player, _Observation, Observation
+from .rl_logging import init_logging
+from .frame_rate_keeper import FrameRateKeeper
+from .base_environment import BaseEnvironment
+
+from rlcompetition.envs.blokus.blokus_env import BlokusEnv
 
 from importlib import import_module
 from typing import Type, Dict, List
+
+ENVIRONMENT_CLASSES = {
+    'blokus': BlokusEnv
+}
 
 logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
@@ -82,7 +89,7 @@ def server_app(dataframe: spacetime.Dataframe,
 
     # Create the inital state for the environment and push it if enabled
     state, player_turns = env.new_state(num_players=len(players))
-    if args["full_state"] and env.serializable():
+    if not args["observations_only"] and env.serializable():
         server_state.serialized_state = env.serialize_state(state)
 
     # Set up each player
@@ -144,7 +151,7 @@ def server_app(dataframe: spacetime.Dataframe,
         )
 
         # Update true state if enabled
-        if args["full_state"] and env.serializable():
+        if not args["observations_only"] and env.serializable():
             server_state.serialized_state = env.serialize_state(state)
 
         # Update the player data from the previous move.
@@ -192,30 +199,37 @@ def server_app(dataframe: spacetime.Dataframe,
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("environment_class", type=str,
-                        help="The full module name of the environment.")
+    parser.add_argument("environment", type=str,
+                        help="The name of the environment. Choices are: ['blokus']")
     parser.add_argument("--config", '-c', type=str, default="",
                         help="Config string that will be passed into the environment constructor.")
     parser.add_argument("--port", "-p", type=int, default=7777,
                         help="Server Port.")
     parser.add_argument("--tick-rate", "-t", type=int, default=60,
-                        help="The tick rate that the server will run on.")
+                        help="The max tick rate that the server will run on.")
     parser.add_argument("--realtime", "-r", action="store_true",
-                        help="With this on, the server will not wait for all of the clients to respond.")
-    parser.add_argument("--full-state", '-f', action='store_true',
-                        help="With this on, the server will also push the true state of the game to the clients.")
+                        help="With this flag on, the server will not wait for all of the clients to respond.")
+    parser.add_argument("--observations-only", '-f', action='store_true',
+                        help="With this flag on, the server will not push the true state of the game to the clients "
+                             "along with observations")
 
     args = parser.parse_args()
     log_params(args)
 
-    env_class: Type[BaseEnvironment] = get_class(args.environment_class)
+    # env_class: Type[BaseEnvironment] = get_class(args.environment_class)
+    try:
+        env_class: Type[BaseEnvironment] = ENVIRONMENT_CLASSES[args.environment]
+    except KeyError:
+        raise ValueError("The \'environment\' argument must must be chosen from the following list: {}".format(
+            ENVIRONMENT_CLASSES.keys()
+        ))
+
     observation_type: Type[_Observation] = Observation(env_class.observation_names())
 
     while True:
-        app = Application(server_app,
+        app = Node(server_app,
                                  server_port=args.port,
-                                 Types=[Player, ServerState],
-                                 version_by=spacetime.utils.enums.VersionBy.FULLSTATE)
+                                 Types=[Player, ServerState])
         app.start(env_class, observation_type, vars(args))
         del app
 

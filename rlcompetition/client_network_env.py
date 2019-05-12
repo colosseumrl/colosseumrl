@@ -6,8 +6,8 @@ import logging
 
 import spacetime
 from spacetime import Application, Dataframe
-from spacetimerl.data_model import Player, ServerState
-from spacetimerl.frame_rate_keeper import FrameRateKeeper
+from .data_model import Player, ServerState
+from .frame_rate_keeper import FrameRateKeeper
 from random import randint
 
 CLIENT_TICK_RATE = 60
