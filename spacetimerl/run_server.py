@@ -31,7 +31,8 @@ def log_params(params):
 def server_app(dataframe: spacetime.Dataframe,
                env_class: Type[BaseEnvironment],
                observation_type: Type,
-               args: dict):
+               args: dict,
+               whitelist: list = []):
     fr: FrameRateKeeper = FrameRateKeeper(max_frame_rate=args['tick_rate'])
 
     # Keep track of each player and their associated observations
@@ -53,6 +54,10 @@ def server_app(dataframe: spacetime.Dataframe,
     env: BaseEnvironment = env_class(args["config"])
 
     logger.info("Waiting for enough players to join ({} required)...".format(env.min_players))
+
+    # Add whitelist support, players will be rejected if their key does not match the expected keys
+    whitelist_used = len(whitelist) > 0
+    whitelist_connected = {key: False for key in whitelist}
     while len(players) < env.min_players:
         fr.tick()
         dataframe.sync()
@@ -60,10 +65,23 @@ def server_app(dataframe: spacetime.Dataframe,
         new_players: Dict[int, Player] = dict((p.pid, p) for p in dataframe.read_all(Player))
 
         for new_id in new_players.keys() - players.keys():
-            logger.info("New player joined with name: {}".format(new_players[new_id].name))
+            name = new_players[new_id].name
+            key = new_players[new_id].authentication_key
+
+            if whitelist_used and key not in whitelist_connected:
+                logger.info("Player tried to join with invalid authentication_key: {}".format(name))
+                del new_players[new_id]
+                continue
+
+            if whitelist_used and whitelist_connected[key]:
+                logger.info("Player tried to join twice with the same authentication_key: {}".format(name))
+                del new_players[new_id]
+                continue
+
+            logger.info("New player joined with name: {}".format(name))
 
             # Create new observation dataframe for the new player
-            obs_df = Dataframe("{}_observation".format(new_players[new_id].name), [observation_type])
+            obs_df = Dataframe("{}_observation".format(name), [observation_type])
             obs = observation_type(new_id)
             obs_df.add_one(observation_type, obs)
 
@@ -170,7 +188,7 @@ def server_app(dataframe: spacetime.Dataframe,
         push_observations()
         dataframe.commit()
 
-    for player in dataframe.read_all(Player):
+    for player in players:
         player.turn = True
 
     dataframe.commit()
@@ -181,7 +199,7 @@ def server_app(dataframe: spacetime.Dataframe,
     # TODO| players would have a similar error when the server would quit while they are pulling.
     # TODO| May need to talk to Rohan about cleanly exiting this kind of situation.
     # TODO| It would also be great if we could instead properly confirm that recipients got a message.
-    for player in dataframe.read_all(Player):
+    for player in players:
         while not player.acknowledges_game_over:
             fr.tick()
             dataframe.checkout()
