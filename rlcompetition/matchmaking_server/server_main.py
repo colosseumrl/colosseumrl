@@ -9,8 +9,8 @@ import zmq
 from threading import Thread
 
 
-from grpc_gen.server_pb2 import QuickMatchReply
-from grpc_gen.server_pb2_grpc import MatchmakerServicer, add_MatchmakerServicer_to_server
+from .grpc_gen.server_pb2 import QuickMatchReply, QuickMatchRequest
+from .grpc_gen.server_pb2_grpc import MatchmakerServicer, add_MatchmakerServicer_to_server
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
@@ -22,15 +22,14 @@ class MatchMakingHandler(MatchmakerServicer):
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
         socket.connect("ipc://matchmaker_requests")
-
-        socket.send_pyobj(request)
-        return socket.recv_pyobj()
+        # print(request.SerializeToString(), QuickMatchRequest.FromString(request.SerializeToString()))
+        socket.send(request.SerializeToString())
+        return QuickMatchReply.FromString(socket.recv())
 
 class MatchProcessJanitor(Thread):
 
     def run(self) -> None:
-
-
+        pass
 
 
 class MatchmakingThread(Thread):
@@ -47,15 +46,15 @@ class MatchmakingThread(Thread):
     def run(self) -> None:
         while True:
 
-            request = self.socket.recv_pyobj()
+            request = QuickMatchRequest.FromString(self.socket.recv())
             print("Got request from {}".format(request.username))
             response = QuickMatchReply(server='localhost:7676', auth_key="kjghdekjghrkegh")
-            self.socket.send_pyobj(response)
+            self.socket.send(response.SerializeToString())
 
 
 def serve():
 
-    matchmaker_thread = matchmaker_service()
+    matchmaker_thread = MatchmakingThread()
     matchmaker_thread.start()
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

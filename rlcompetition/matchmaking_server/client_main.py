@@ -3,8 +3,8 @@ import logging
 
 import grpc
 
-from grpc_gen.server_pb2 import QuickMatchRequest
-from grpc_gen.server_pb2_grpc import MatchmakerStub
+from .grpc_gen.server_pb2 import QuickMatchRequest
+from .grpc_gen.server_pb2_grpc import MatchmakerStub
 
 
 def run():
