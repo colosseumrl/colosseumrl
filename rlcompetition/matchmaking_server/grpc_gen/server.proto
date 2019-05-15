@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+// The greeting service definition.
+service Matchmaker {
+  // Sends a greeting
+  rpc GetMatch (QuickMatchRequest) returns (QuickMatchReply) {}
+}
+
+// The request message containing the user's name.
+message QuickMatchRequest {
+  string username = 1;
+}
+
+// The response message containing the greetings
+message QuickMatchReply {
+  string server = 1;
+  string auth_key = 2;
+}
