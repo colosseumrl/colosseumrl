@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\x15grpc_gen/server.proto\"%\n\x11QuickMatchRequest\x12\x10\n\x08username\x18\x01 \x01(\t\"3\n\x0fQuickMatchReply\x12\x0e\n\x06server\x18\x01 \x01(\t\x12\x10\n\x08\x61uth_key\x18\x02 \x01(\t2@\n\nMatchmaker\x12\x32\n\x08GetMatch\x12\x12.QuickMatchRequest\x1a\x10.QuickMatchReply\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x15grpc_gen/server.proto\"%\n\x11QuickMatchRequest\x12\x10\n\x08username\x18\x01 \x01(\t\"E\n\x0fQuickMatchReply\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x0e\n\x06server\x18\x02 \x01(\t\x12\x10\n\x08\x61uth_key\x18\x03 \x01(\t2@\n\nMatchmaker\x12\x32\n\x08GetMatch\x12\x12.QuickMatchRequest\x1a\x10.QuickMatchReply\"\x00\x62\x06proto3')
 )
 
 
@@ -65,15 +65,22 @@ _QUICKMATCHREPLY = _descriptor.Descriptor(
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='server', full_name='QuickMatchReply.server', index=0,
+      name='username', full_name='QuickMatchReply.username', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='auth_key', full_name='QuickMatchReply.auth_key', index=1,
+      name='server', full_name='QuickMatchReply.server', index=1,
       number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='auth_key', full_name='QuickMatchReply.auth_key', index=2,
+      number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -91,7 +98,7 @@ _QUICKMATCHREPLY = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=64,
-  serialized_end=115,
+  serialized_end=133,
 )
 
 DESCRIPTOR.message_types_by_name['QuickMatchRequest'] = _QUICKMATCHREQUEST
@@ -120,8 +127,8 @@ _MATCHMAKER = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=117,
-  serialized_end=181,
+  serialized_start=135,
+  serialized_end=199,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetMatch',

@@ -13,6 +13,7 @@ message QuickMatchRequest {
 
 // The response message containing the greetings
 message QuickMatchReply {
-  string server = 1;
-  string auth_key = 2;
+  string username = 1;
+  string server = 2;
+  string auth_key = 3;
 }

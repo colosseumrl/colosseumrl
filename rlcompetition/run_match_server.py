@@ -5,34 +5,22 @@ import spacetime
 from spacetime import Node, Dataframe
 
 from .data_model import ServerState, Player, _Observation, Observation
-from .rl_logging import init_logging
+from .rl_logging import init_logging, get_logger
 from .frame_rate_keeper import FrameRateKeeper
 from .base_environment import BaseEnvironment
-
-from rlcompetition.envs.blokus.blokus_env import BlokusEnv
+from .config import ENVIRONMENT_CLASSES
+from .util import log_params
 
 from importlib import import_module
 from typing import Type, Dict, List
 
-ENVIRONMENT_CLASSES = {
-    'blokus': BlokusEnv
-}
-
-logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
-
+logger = get_logger()
 
 def get_class(kls: str):
     """ Dynamically import a python class from a module listing. """
     module, name = kls.rsplit('.', 1)
     module = import_module(module)
     return getattr(module, name)
-
-
-def log_params(params):
-    """ Print the current parameters to the log file. """
-    params = vars(params)
-    for k in sorted(params.keys()):
-        logger.info('{}: {}'.format(k, params[k]))
 
 
 def server_app(dataframe: spacetime.Dataframe,
@@ -215,6 +203,8 @@ def server_app(dataframe: spacetime.Dataframe,
 
 
 if __name__ == '__main__':
+
+    logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("environment", type=str,
