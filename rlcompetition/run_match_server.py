@@ -120,6 +120,7 @@ def server_app(dataframe: spacetime.Dataframe,
         fr.tick()
 
     # Start the game
+    logger.info("Game started...")
     terminal = False
 
     server_state.server_no_longer_joinable = True
@@ -183,7 +184,7 @@ def server_app(dataframe: spacetime.Dataframe,
         push_observations()
         dataframe.commit()
 
-    for player in players:
+    for player in players.values():
         player.turn = True
 
     dataframe.commit()
@@ -194,7 +195,7 @@ def server_app(dataframe: spacetime.Dataframe,
     # TODO| players would have a similar error when the server would quit while they are pulling.
     # TODO| May need to talk to Rohan about cleanly exiting this kind of situation.
     # TODO| It would also be great if we could instead properly confirm that recipients got a message.
-    for player in players:
+    for player in players.values():
         while not player.acknowledges_game_over:
             fr.tick()
             dataframe.checkout()

@@ -100,6 +100,7 @@ def main():
             if first_turn:
                 client_remote.send(("first_observation", None))
                 logger.debug("Player {} first observation: {}".format(i, client_remote.recv()))
+                logger.info("Game started...")
             else:
                 new_obs, reward, terminal, winners = client_remote.recv()
                 logger.debug("Player i took step with action {}, got: {}".format(i, player_actions[i],

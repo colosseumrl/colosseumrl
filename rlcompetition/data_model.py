@@ -29,6 +29,7 @@ class _Observation:
 @pcc_set
 class Player(object):
     pid = primarykey(int)
+    authentication_key = dimension(str)
 
     number = dimension(int)
     name = dimension(str)
@@ -45,6 +46,7 @@ class Player(object):
 
     def __init__(self, name):
         self.pid = random.randint(0, sys.maxsize)
+        self.authentication_key = ""
         self.name = name
         self.number = -1
         self.action = ""

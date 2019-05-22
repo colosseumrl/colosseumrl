@@ -13,6 +13,7 @@ def main(ce: BlokusClientEnv):
     logger.debug("Connecting to server and waiting for game to start...")
     player_num = ce.connect("player_{}".format(np.random.randint(0, 1024)))
     logger.debug("First observation: {}".format(ce.wait_for_turn()))
+    logger.info("Game started...")
     winners = None
 
     while True:
