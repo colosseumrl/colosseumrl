@@ -131,7 +131,7 @@ def terminate_gui():
     gui.terminate_gui()
 
 
-def display_board(state: object, player_num: int, winners: Union[List[int], None]):
+def display_board(state: object, player_num: int, winners: Union[List[int], None] = None):
     """Render Board with graphical interface
 
     Parameters
@@ -156,8 +156,7 @@ def display_board(state: object, player_num: int, winners: Union[List[int], None
 
     """
 
-    _, inner_state = state
-    board, round_count, players = inner_state
+    board, round_count, players = state
     current_player = players[player_num]
     gui.display_board(board_contents=board.board_contents, current_player=current_player, players=players,
                       round_count=round_count, winners=winners)
