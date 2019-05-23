@@ -1,15 +1,15 @@
-import spacetime
 import numpy as np
+import struct
+import pickle
+import logging
+
+from time import sleep, time
+from typing import Callable, Type, Optional, List, Dict
+
 from spacetime import Dataframe, Node
 from .data_model import ServerState, Player, Observation
 from .frame_rate_keeper import FrameRateKeeper
 from .base_environment import BaseEnvironment
-
-from time import sleep, time
-import struct
-from typing import Callable, Type, Optional, List, Dict
-import pickle
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,12 @@ logger = logging.getLogger(__name__)
 class ClientEnv:
     _TickRate = 60
 
-    def __init__(self, dataframe: Dataframe, dimensions: List[str], observation_class: Type[Observation], host: str,
-                 server_environment: Optional[Type[BaseEnvironment]] = None):
+    def __init__(self, dataframe: Dataframe,
+                 dimensions: List[str],
+                 observation_class: Type[Observation],
+                 host: str,
+                 server_environment: Optional[Type[BaseEnvironment]] = None,
+                 auth_key: str = ''):
 
         self.player_df: Dataframe = dataframe
         self.observation_df: Dataframe = None
@@ -37,6 +41,7 @@ class ClientEnv:
         self.dimensions: List[str] = dimensions
 
         self._host = host
+        self._auth_key = auth_key
 
         self._server_environment: Optional[BaseEnvironment] = None
         if server_environment is not None:
@@ -106,7 +111,7 @@ class ClientEnv:
         """
         # Add this player to the game.
         self.__pull()
-        self._player: Player = Player(name=name)
+        self._player: Player = Player(name=name, auth_key=self._auth_key)
         self.player_df.add_one(Player, self._player)
         self.__push()
         sleep(0.1)
@@ -213,20 +218,30 @@ class ClientEnv:
         return self.observation, reward, terminal, winners
 
 
-def client_app(dataframe: Dataframe, app: "RLApp", client_function: Callable,
-               observation_class: Type[Observation], dimension_names: [str], host, *args, **kwargs):
+def client_app(dataframe: Dataframe,
+               app: "RLApp",
+               client_function: Callable,
+               observation_class: Type[Observation],
+               dimension_names: [str],
+               host: str,
+               auth_key: str,
+               *args, **kwargs):
 
     client_env = app.client_environment(dataframe=dataframe,
-                           dimensions=dimension_names,
-                           observation_class=observation_class,
-                           server_environment=app.server_environment,
-                           host=host)
+                                        dimensions=dimension_names,
+                                        observation_class=observation_class,
+                                        server_environment=app.server_environment,
+                                        host=host,
+                                        auth_key=auth_key)
 
     client_function(client_env, *args, **kwargs)
 
 
 class RLApp:
-    def __init__(self, host: str, port: int,
+    def __init__(self,
+                 host: str,
+                 port: int,
+                 auth_key: str = '',
                  client_environment: Type[ClientEnv] = ClientEnv,
                  server_environment: Optional[Type[BaseEnvironment]] = None,
                  time_out: int = 0):
@@ -234,16 +249,15 @@ class RLApp:
         self.server_environment = server_environment
         self.host = host
         self.port = port
+        self.auth_key = auth_key
         self.time_out = time_out
 
     def __call__(self, main_func: Callable):
         # Get the dimensions required for the player dataframe
         start_time = time()
 
-        while True:
-
+        while self.time_out == 0 or (time() - start_time) < self.time_out:
             try:
-
                 while True:
                     try:
                         df = Dataframe("dimension_getter", [ServerState], details=(self.host, self.port))
@@ -273,11 +287,33 @@ class RLApp:
 
         def app(*args, **kwargs):
             client = Node(client_app,
-                                 dataframe=(self.host, self.port),
-                                 Types=[Player, observation_class, ServerState])
-            client.start(self, main_func, observation_class, dimension_names, self.host, *args, **kwargs)
+                          dataframe=(self.host, self.port),
+                          Types=[Player, observation_class, ServerState])
+            client.start(self, main_func, observation_class, dimension_names, self.host, self.auth_key, *args, **kwargs)
 
         return app
+
+
+def create_rl_agent(agent_fn: Callable[[ClientEnv], None],
+                    host: str,
+                    port: int,
+                    auth_key: str = '',
+                    client_environment: Type[ClientEnv] = ClientEnv,
+                    server_environment: Optional[Type[BaseEnvironment]] = None,
+                    time_out: int = 0):
+    return RLApp(host, port, auth_key, client_environment, server_environment, time_out)(agent_fn)
+
+
+def launch_rl_agent(agent_fn: Callable[[ClientEnv], None],
+                    host: str,
+                    port: int,
+                    auth_key: str = '',
+                    client_environment: Type[ClientEnv] = ClientEnv,
+                    server_environment: Optional[Type[BaseEnvironment]] = None,
+                    time_out: int = 0,
+                    **kwargs):
+    return create_rl_agent(agent_fn, host, port, auth_key, client_environment, server_environment, time_out)(**kwargs)
+
 
 
 

@@ -1,3 +1,5 @@
+""" Example server environment primarily for testing. """
+
 from typing import Tuple, List, Union, Dict
 import numpy as np
 from .base_environment import BaseEnvironment

@@ -1,3 +1,6 @@
+""" Abstract definition of a game environment. Whenever you wish to make a new environment, make sure to subclass
+this to have all of the correct functions. """
+
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Union, Dict
 import numpy as np

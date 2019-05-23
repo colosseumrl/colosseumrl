@@ -2,11 +2,10 @@ import time
 
 
 class FrameRateKeeper:
-
-    def __init__(self, max_frame_rate):
-        self.max_frame_rate = max_frame_rate
-        self.max_frame_time = 1.0 / max_frame_rate
-        self.frame_start_time = time.time()
+    def __init__(self, max_frame_rate: float):
+        self.max_frame_rate: float = max_frame_rate
+        self.max_frame_time: float = 1.0 / max_frame_rate
+        self.frame_start_time: float = time.time()
 
     def tick(self):
         end_time = time.time()

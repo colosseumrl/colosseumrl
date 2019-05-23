@@ -1,37 +1,32 @@
-from concurrent import futures
 import time
-import logging
 import secrets
 import grpc
 import argparse
-
 import zmq
 
 from queue import Queue
-from threading import Thread, Semaphore
-from typing import Type, Dict, List
 from collections import deque
-
+from concurrent import futures
+from threading import Thread, Semaphore
+from multiprocessing import Event
+from typing import Type, Dict, List
 
 from .grpc_gen.server_pb2 import QuickMatchReply, QuickMatchRequest
 from .grpc_gen.server_pb2_grpc import MatchmakerServicer, add_MatchmakerServicer_to_server
-from rlcompetition.run_match_server import server_app
+from rlcompetition.match_server import server_app
 from rlcompetition.data_model import ServerState, Player, _Observation, Observation
 
 from rlcompetition.config import ENVIRONMENT_CLASSES
 from rlcompetition.base_environment import BaseEnvironment
-from rlcompetition.util import log_params, is_port_in_use
+from rlcompetition.util import is_port_in_use
 from rlcompetition.rl_logging import init_logging
 
 from spacetime import Node
 
 
-_ONE_DAY_IN_SECONDS = 60 * 60 * 24
+def match_server_args_factory(tick_rate: int, realtime: bool, observations_only: bool, env_config_string: str):
+    """ Helper factory to make a argument dictionary for servers with varying ports """
 
-
-
-
-def match_server_args_factory(tick_rate, realtime, observations_only, env_config_string):
     def match_server_args(port):
         arg_dict = {
             "tick_rate": tick_rate,
@@ -44,48 +39,64 @@ def match_server_args_factory(tick_rate, realtime, observations_only, env_config
 
     return match_server_args
 
+
 class MatchMakingHandler(MatchmakerServicer):
+    """ GRPC connection handler.
+
+        Clients will connect to the server and call this function to request a match. """
 
     def GetMatch(self, request, context):
-        #  Prepare our context and sockets
+        # Prepare ZeroMQ connection
+        # We use ZeroMQ to communicate between the handler and the matchmaking server
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
         socket.connect("ipc://matchmaker_requests")
+
+        # Request a new match
         # print(request.SerializeToString(), QuickMatchRequest.FromString(request.SerializeToString()))
         socket.send(request.SerializeToString())
         return QuickMatchReply.FromString(socket.recv())
 
 
 class MatchProcessJanitor(Thread):
+    """ Simple thread to manage the lifetime of a game server. Will start the game server and
+        close it when the game is finished and release any resources it was holding. """
 
-    def __init__(self, match_limit: Semaphore, ports_to_use_queue, env_class, match_server_args):
+    def __init__(self,
+                 match_limit: Semaphore,
+                 ports_to_use_queue: Queue,
+                 env_class: Type[BaseEnvironment],
+                 match_server_args: Dict,
+                 whitelist: List = None):
         super().__init__()
         self.match_limit = match_limit
         self.match_server_args = match_server_args
         self.env_class = env_class
         self.ports_to_use_queue = ports_to_use_queue
+        self.whitelist = whitelist
+        self.ready = Event()
 
     def run(self) -> None:
         port = self.match_server_args['port']
-
         observation_type: Type[_Observation] = Observation(self.env_class.observation_names())
 
-        app = Node(server_app,
-                   server_port=port,
-                   Types=[Player, ServerState])
-        app.start(self.env_class, observation_type, self.match_server_args)
+        # App blocks until the server has ended
+        app = Node(server_app, server_port=port, Types=[Player, ServerState])
+        app.start(self.env_class, observation_type, self.match_server_args, self.whitelist, self.ready)
         del app
-        print("Janitor Finished")
+
         self.ports_to_use_queue.put(port)
         self.match_limit.release()
 
 
 class MatchmakingThread(Thread):
 
-    def __init__(self, starting_port, hostname, max_simultaneous_games, env_class, tick_rate, realtime, observations_only,
+    def __init__(self, starting_port, hostname, max_simultaneous_games, env_class, tick_rate, realtime,
+                 observations_only,
                  env_config_string):
         super().__init__()
 
+        self.players_per_game = env_class(env_config_string).min_players
         self.env_class = env_class
         self.hostname = hostname
 
@@ -99,18 +110,17 @@ class MatchmakingThread(Thread):
         self.match_limit = Semaphore(max_simultaneous_games)
 
         # Helper function to make arguments for match threads
-        self.create_match_server_args = match_server_args_factory(tick_rate=tick_rate, realtime=realtime,
+        self.create_match_server_args = match_server_args_factory(tick_rate=tick_rate,
+                                                                  realtime=realtime,
                                                                   observations_only=observations_only,
                                                                   env_config_string=env_config_string)
 
-        self.players_per_game = env_class(env_config_string).min_players
-
+        # Keep track of the ports we can use and iterate through them as we start new servers
         self.ports_to_use = Queue()
-
-        max_port = starting_port + 2*max_simultaneous_games
+        max_port = starting_port + 2 * max_simultaneous_games
         for port in range(starting_port, max_port):
             if not is_port_in_use(port):
-               self.ports_to_use.put(port)
+                self.ports_to_use.put(port)
             else:
                 logger.warn("Skipping port {}, already in use.".format(port))
 
@@ -119,30 +129,36 @@ class MatchmakingThread(Thread):
                           "to hold {} simultaneous games".format(starting_port, max_port, max_simultaneous_games))
 
     def run(self) -> None:
-
         match_requests = deque()
 
         while True:
+            # Grab a new request
             identity, _, serialized_request = self.socket.recv_multipart()
             request = QuickMatchRequest.FromString(serialized_request)
 
+            # Add them to the queue and generate a token for them
             print("Got request from {}".format(request.username))
             auth_key = secrets.token_hex(32)
             match_requests.append((identity, request, auth_key))
 
+            # Once we have enough players for a game, start a game server and send the coordinates
             if len(match_requests) >= self.players_per_game:
-
                 self.match_limit.acquire()
+                new_players = [match_requests.pop() for _ in range(self.players_per_game)]
+
+                whitelist = [player[2] for player in new_players]
                 match_port = self.ports_to_use.get()
                 match_server_args = self.create_match_server_args(port=match_port)
 
-                match_janitor = MatchProcessJanitor(match_limit=self.match_limit, ports_to_use_queue=self.ports_to_use,
+                match_janitor = MatchProcessJanitor(match_limit=self.match_limit,
+                                                    ports_to_use_queue=self.ports_to_use,
                                                     env_class=self.env_class,
-                                                    match_server_args=match_server_args)
+                                                    match_server_args=match_server_args,
+                                                    whitelist=whitelist)
                 match_janitor.start()
+                match_janitor.ready.wait()
 
-                for _ in range(self.players_per_game):
-                    identity, request, auth_key = match_requests.pop()
+                for identity, request, auth_key in new_players:
                     response = QuickMatchReply(username=request.username,
                                                server='{}:{}'.format(self.hostname, match_port),
                                                auth_key=auth_key)
@@ -150,68 +166,58 @@ class MatchmakingThread(Thread):
                     self.socket.send_multipart((identity, b"", response.SerializeToString()))
 
 
-
-
-
-def serve():
-
+def serve(args):
+    # Start the separate matchmaking thread
     matchmaker_thread = MatchmakingThread(
-        hostname='localhost',
-        starting_port=21450,
-        max_simultaneous_games=50,
-        env_class=ENVIRONMENT_CLASSES['blokus'],
-        tick_rate=20,
-        realtime=False,
-        observations_only=False,
-        env_config_string="",
+        hostname=args['hostname'],
+        starting_port=args['game_port'],
+        max_simultaneous_games=args['max_games'],
+        env_class=ENVIRONMENT_CLASSES[args['environment']],
+        tick_rate=args['tick_rate'],
+        realtime=args['realtime'],
+        observations_only=args['observations_only'],
+        env_config_string=args['config'],
 
     )
     matchmaker_thread.start()
 
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    # Start the GRPC callback server
+    server = grpc.server(futures.ThreadPoolExecutor())
     add_MatchmakerServicer_to_server(MatchMakingHandler(), server)
-    server.add_insecure_port('[::]:50051')
+    server.add_insecure_port('[::]:{}'.format(args['matchmaking_port']))
     server.start()
     try:
+        one_day = 3600 * 24
         while True:
-            time.sleep(_ONE_DAY_IN_SECONDS)
+            time.sleep(one_day)
     except KeyboardInterrupt:
         server.stop(0)
 
 
 if __name__ == '__main__':
-
     logger = init_logging()
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--environment", "-e", type=str, default="test",
+                        help="The name of the environment. Choices are: {}".format(ENVIRONMENT_CLASSES.keys()))
+    parser.add_argument("--hostname", type=str, default='localhost',
+                        help="Hostname to start the matchmaking and game servers on. Defaults to 'localhost'")
+    parser.add_argument("--matchmaking-port", type=int, default=50051,
+                        help="Port to start matchmaking server on.")
+    parser.add_argument("--game-port", type=int, default=21450,
+                        help="Port to start game servers on. Will use a range starting at this port to this port"
+                             "plus the number of games.")
+    parser.add_argument("--max-games", "-m", type=int, default=1,
+                        help="Number of games to run in parallel on this server.")
+    parser.add_argument("--tick-rate", "-t", type=int, default=60,
+                        help="The max tick rate that the server will run on.")
+    parser.add_argument("--realtime", "-r", action="store_true",
+                        help="With this flag on, the server will not wait for all of the clients to respond.")
+    parser.add_argument("--observations-only", '-f', action='store_true',
+                        help="With this flag on, the server will not push the true state of the game to the clients "
+                             "along with observations")
+    parser.add_argument("--config", '-c', type=str, default="",
+                        help="Config string that will be passed into the environment constructor.")
 
-    # parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    # parser.add_argument("environment", type=str,
-    #                     help="The name of the environment. Choices are: ['blokus']")
-    # parser.add_argument("--config", '-c', type=str, default="",
-    #                     help="Config string that will be passed into the environment constructor.")
-    # parser.add_argument("--starting_port", "-p", type=int, default=7676,
-    #                     help="Server Port.")
-    # parser.add_argument("--tick-rate", "-t", type=int, default=60,
-    #                     help="The max tick rate that the server will run on.")
-    # parser.add_argument("--realtime", "-r", action="store_true",
-    #                     help="With this flag on, the server will not wait for all of the clients to respond.")
-    # parser.add_argument("--observations-only", '-f', action='store_true',
-    #                     help="With this flag on, the server will not push the true state of the game to the clients "
-    #                          "along with observations")
-    #
-    # main_args = parser.parse_args()
-    #
-    # # env_class: Type[BaseEnvironment] = get_class(args.environment_class)
-    # try:
-    #     env_class: Type[BaseEnvironment] = ENVIRONMENT_CLASSES[main_args.environment]
-    # except KeyError:
-    #     raise ValueError("The \'environment\' argument must must be chosen from the following list: {}".format(
-    #         ENVIRONMENT_CLASSES.keys()
-    #     ))
-    #
-    #
-    #
-    # log_params(main_args)
+    command_line_args = parser.parse_args()
 
-
-
-    serve()
+    serve(vars(command_line_args))

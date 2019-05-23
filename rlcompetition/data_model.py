@@ -1,3 +1,5 @@
+""" Data types that will be used by the Spacetime backend. """
+
 from rtypes import pcc_set, merge
 from rtypes import dimension, primarykey
 from typing import List, Dict
@@ -44,9 +46,9 @@ class Player(object):
     acknowledges_game_over = dimension(bool)
     winner = dimension(bool)
 
-    def __init__(self, name):
+    def __init__(self, name, auth_key: str = ""):
         self.pid = random.randint(0, sys.maxsize)
-        self.authentication_key = ""
+        self.authentication_key = auth_key
         self.name = name
         self.number = -1
         self.action = ""

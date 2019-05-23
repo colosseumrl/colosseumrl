@@ -1,5 +1,10 @@
+""" Monolithic game server function. This file contains all the backend logic to execute moves and
+push the observations to the agents. """
+
 import argparse
 import pickle
+from multiprocessing import Event
+from typing import Type, Dict, List
 
 import spacetime
 from spacetime import Node, Dataframe
@@ -11,23 +16,16 @@ from .base_environment import BaseEnvironment
 from .config import ENVIRONMENT_CLASSES
 from .util import log_params
 
-from importlib import import_module
-from typing import Type, Dict, List
 
 logger = get_logger()
-
-def get_class(kls: str):
-    """ Dynamically import a python class from a module listing. """
-    module, name = kls.rsplit('.', 1)
-    module = import_module(module)
-    return getattr(module, name)
 
 
 def server_app(dataframe: spacetime.Dataframe,
                env_class: Type[BaseEnvironment],
                observation_type: Type,
                args: dict,
-               whitelist: list = []):
+               whitelist: list = None,
+               ready_event: Event = None):
     fr: FrameRateKeeper = FrameRateKeeper(max_frame_rate=args['tick_rate'])
 
     # Keep track of each player and their associated observations
@@ -51,8 +49,14 @@ def server_app(dataframe: spacetime.Dataframe,
     logger.info("Waiting for enough players to join ({} required)...".format(env.min_players))
 
     # Add whitelist support, players will be rejected if their key does not match the expected keys
+    whitelist = [] if whitelist is None else whitelist
     whitelist_used = len(whitelist) > 0
     whitelist_connected = {key: False for key in whitelist}
+
+    # If we were created by some server manager, inform them we are ready for players
+    if ready_event is not None:
+        ready_event.set()
+
     while len(players) < env.min_players:
         fr.tick()
         dataframe.sync()
@@ -61,14 +65,14 @@ def server_app(dataframe: spacetime.Dataframe,
 
         for new_id in new_players.keys() - players.keys():
             name = new_players[new_id].name
-            key = new_players[new_id].authentication_key
+            auth_key = new_players[new_id].authentication_key
 
-            if whitelist_used and key not in whitelist_connected:
+            if whitelist_used and auth_key not in whitelist_connected:
                 logger.info("Player tried to join with invalid authentication_key: {}".format(name))
                 del new_players[new_id]
                 continue
 
-            if whitelist_used and whitelist_connected[key]:
+            if whitelist_used and whitelist_connected[auth_key]:
                 logger.info("Player tried to join twice with the same authentication_key: {}".format(name))
                 del new_players[new_id]
                 continue
@@ -83,9 +87,14 @@ def server_app(dataframe: spacetime.Dataframe,
             # Add the dataframes to the database
             observation_dataframes[new_id] = obs_df
             observations[new_id] = obs
+            whitelist_connected[auth_key] = True
 
         for remove_id in players.keys() - new_players.keys():
             logger.info("Player {} has left.".format(players[remove_id].name))
+
+            auth_key = players[remove_id].authentication_key
+            whitelist_connected[auth_key] = False
+
             del observations[remove_id]
             del observation_dataframes[remove_id]
 
@@ -93,7 +102,7 @@ def server_app(dataframe: spacetime.Dataframe,
 
     logger.info("Finalizing players and setting up new environment.")
 
-    # Create the inital state for the environment and push it if enabled
+    # Create the initial state for the environment and push it if enabled
     state, player_turns = env.new_state(num_players=len(players))
     if not args["observations_only"] and env.serializable():
         server_state.serialized_state = env.serialize_state(state)
@@ -237,8 +246,8 @@ if __name__ == '__main__':
 
     while True:
         app = Node(server_app,
-                                 server_port=args.port,
-                                 Types=[Player, ServerState])
+                   server_port=args.port,
+                   Types=[Player, ServerState])
         app.start(env_class, observation_type, vars(args))
         del app
 
