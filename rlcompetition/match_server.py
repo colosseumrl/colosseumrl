@@ -4,7 +4,7 @@ push the observations to the agents. """
 import argparse
 import pickle
 from multiprocessing import Event
-from typing import Type, Dict, List
+from typing import Type, Dict, List, NamedTuple
 
 import spacetime
 from spacetime import Node, Dataframe
@@ -20,12 +20,21 @@ from .util import log_params
 logger = get_logger()
 
 
+class Timeout(NamedTuple):
+    connect: float = 30.0
+    start: float = 5.0
+    move: float = 5.0
+    end: float = 10.0
+
+
 def server_app(dataframe: spacetime.Dataframe,
                env_class: Type[BaseEnvironment],
                observation_type: Type,
                args: dict,
                whitelist: list = None,
                ready_event: Event = None):
+    timeout = Timeout()
+
     fr: FrameRateKeeper = FrameRateKeeper(max_frame_rate=args['tick_rate'])
 
     # Keep track of each player and their associated observations
@@ -57,12 +66,19 @@ def server_app(dataframe: spacetime.Dataframe,
     if ready_event is not None:
         ready_event.set()
 
+    # -----------------------------------------------------------------------------------------------
+    # Wait for all players to connect
+    # -----------------------------------------------------------------------------------------------
+    fr.start_timeout(timeout.connect)
     while len(players) < env.min_players:
-        fr.tick()
-        dataframe.sync()
+        if fr.tick():
+            logger.error("Game could not find enough players in the alloted time. Shutting down game server.")
+            return -1
 
+        dataframe.sync()
         new_players: Dict[int, Player] = dict((p.pid, p) for p in dataframe.read_all(Player))
 
+        # Any players that have connected by have not been acknowledged yet
         for new_id in new_players.keys() - players.keys():
             name = new_players[new_id].name
             auth_key = new_players[new_id].authentication_key
@@ -89,6 +105,7 @@ def server_app(dataframe: spacetime.Dataframe,
             observations[new_id] = obs
             whitelist_connected[auth_key] = True
 
+        # If any players that we have added before have dropped out
         for remove_id in players.keys() - new_players.keys():
             logger.info("Player {} has left.".format(players[remove_id].name))
 
@@ -100,6 +117,9 @@ def server_app(dataframe: spacetime.Dataframe,
 
         players = new_players
 
+    # -----------------------------------------------------------------------------------------------
+    # Create all of the player data and wait for the game to begin
+    # -----------------------------------------------------------------------------------------------
     logger.info("Finalizing players and setting up new environment.")
 
     # Create the initial state for the environment and push it if enabled
@@ -123,22 +143,27 @@ def server_app(dataframe: spacetime.Dataframe,
     dataframe.sync()
 
     # Wait for all players to be ready
-    # TODO: Add timeout to this
+    fr.start_timeout(timeout.start)
     while not all(player.ready_for_start for player in players.values()):
-        dataframe.checkout()
-        fr.tick()
+        if fr.tick():
+            logger.error("Players have dropped out between entering the game and starting the game.")
+            return -2
 
-    # Start the game
+        dataframe.checkout()
+
+    # -----------------------------------------------------------------------------------------------
+    # Primary game loop
+    # -----------------------------------------------------------------------------------------------
     logger.info("Game started...")
     terminal = False
 
     server_state.server_no_longer_joinable = True
     dataframe.commit()
 
-    turn_count = 0
+    fr.start_timeout(timeout.move)
     while not terminal:
         # Wait for a frame to tick
-        fr.tick()
+        move_timeout = fr.tick()
 
         # Get new data
         dataframe.checkout()
@@ -147,7 +172,9 @@ def server_app(dataframe: spacetime.Dataframe,
         current_players: List[Player] = [p for p in players.values() if p.number in player_turns]
         current_actions: List[str] = []
 
-        if not args['realtime'] and not all(p.ready_for_action_to_be_taken for p in current_players):
+        if (not args['realtime'] and
+            not move_timeout and
+            not all(p.ready_for_action_to_be_taken for p in current_players)):
             continue
 
         # Queue up each players action if it is legal
@@ -189,10 +216,13 @@ def server_app(dataframe: spacetime.Dataframe,
                 players_by_number[player_number].winner = True
             logger.info("Player: {} won the game.".format(winners))
 
-        turn_count += 1
         push_observations()
         dataframe.commit()
+        fr.start_timeout(timeout.move)
 
+    # -----------------------------------------------------------------------------------------------
+    # Clean up after game
+    # -----------------------------------------------------------------------------------------------
     for player in players.values():
         player.turn = True
 
@@ -204,9 +234,9 @@ def server_app(dataframe: spacetime.Dataframe,
     # TODO| players would have a similar error when the server would quit while they are pulling.
     # TODO| May need to talk to Rohan about cleanly exiting this kind of situation.
     # TODO| It would also be great if we could instead properly confirm that recipients got a message.
+    fr.start_timeout(timeout.end)
     for player in players.values():
-        while not player.acknowledges_game_over:
-            fr.tick()
+        while not player.acknowledges_game_over and not fr.tick():
             dataframe.checkout()
 
     logger.info("Game has ended. Player {} is the winner.".format(dataframe.read_one(ServerState, server_state.oid)))

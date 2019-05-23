@@ -1,0 +1,1 @@
+from .client_main import request_game

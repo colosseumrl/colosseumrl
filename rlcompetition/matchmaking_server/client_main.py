@@ -12,9 +12,51 @@ from ..envs.blokus.blokus_env import BlokusEnv
 from ..envs.blokus.blokus_client_env import BlokusClientEnv
 from rlcompetition.rl_logging import init_logging
 from rlcompetition.client_environment import RLApp
-import numpy as np
+import numpy as np3
 from random import choice
 
+from collections import namedtuple
+from typing import NamedTuple
+
+
+class GameResponse(NamedTuple):
+    host: str
+    port: int
+    username: str
+    token: str
+
+
+def request_game(hostname: str, port: int, username: str, password: str = "") -> GameResponse:
+    """ Contact a matchmaking server and ask for a new game.
+
+    This function will block until enough players connect to create a server.
+
+    Parameters
+    ----------
+    hostname: str
+    port: int
+        Hostname and port of the remote matchmaking server
+    username: str
+        Username that will identify you in the game.
+    password: str
+        NOT USED CURRENT: Password to confirm your username, this will be used for tournament and ranking.
+
+    Returns
+    -------
+    GameResponse NamedTuple with the following fields
+        host: str
+        port: int
+            Hostname and port of the game server that was created for you
+        username: str
+            Your username again to verify.
+        token: str
+            Authentication string you will need to provide to connect to the match server
+    """
+    with grpc.insecure_channel('{}:{}'.format(hostname, port)) as channel:
+        response = MatchmakerStub(channel).GetMatch(QuickMatchRequest(username=username))
+
+    host, port = response.server.split(":")
+    return GameResponse(host, int(port), username, response.auth_key)
 
 def client(ce: BlokusClientEnv):
     logger = init_logging()
@@ -51,7 +93,6 @@ def run():
     host, port = response.server.split(":")
     app = RLApp(host, int(port), response.auth_key, BlokusClientEnv, BlokusEnv)(client)
     app()
-
 
 if __name__ == '__main__':
     logging.basicConfig()

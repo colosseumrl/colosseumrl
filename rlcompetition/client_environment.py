@@ -17,7 +17,8 @@ logger = logging.getLogger(__name__)
 class ClientEnv:
     _TickRate = 60
 
-    def __init__(self, dataframe: Dataframe,
+    def __init__(self,
+                 dataframe: Dataframe,
                  dimensions: List[str],
                  observation_class: Type[Observation],
                  host: str,
