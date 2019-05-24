@@ -1,18 +1,53 @@
 """ Central configuration file, primarily used for listing the available environments. """
 
-from rlcompetition.envs.blokus.blokus_env import BlokusEnv
-from rlcompetition.envs.tron.TronGridEnvironment import TronGridEnvironment
-from rlcompetition.envs.tictactoe.tictactoe_2p_env import TicTacToe2PlayerEnv
-from rlcompetition.envs.tictactoe.tictactoe_3p_env import TicTacToe3PlayerEnv
-from rlcompetition.envs.tictactoe.tictactoe_4p_env import TicTacToe4PlayerEnv
 
-from rlcompetition.test_game import TestGame
+def blokus():
+    from rlcompetition.envs.blokus import BlokusEnvironment
+    return BlokusEnvironment
+
+
+def tron():
+    from rlcompetition.envs.tron.TronGridEnvironment import TronGridEnvironment
+    return TronGridEnvironment
+
+
+def test_game():
+    from rlcompetition.envs.testgame.TestGame import TestGame
+    return TestGame
+
+
+def tic_tac_toe(n):
+    def ttt():
+        if n == 2:
+            from rlcompetition.envs.tictactoe.tictactoe_2p_env import TicTacToe2PlayerEnv
+            return TicTacToe2PlayerEnv
+        if n == 3:
+            from rlcompetition.envs.tictactoe.tictactoe_3p_env import TicTacToe3PlayerEnv
+            return TicTacToe3PlayerEnv
+        if n == 4:
+            from rlcompetition.envs.tictactoe.tictactoe_4p_env import TicTacToe4PlayerEnv
+            return TicTacToe4PlayerEnv
+        else:
+            raise ValueError("No Tic Tac Toe with {} players".format(n))
+    return ttt
+
 
 ENVIRONMENT_CLASSES = {
-    'blokus': BlokusEnv,
-    'tron': TronGridEnvironment,
-    'tictactoe' : TicTacToe2PlayerEnv,
-    'tictactoe_3p' : TicTacToe3PlayerEnv,
-    'tictactoe_4p' : TicTacToe4PlayerEnv,
-    'test': TestGame,
+    'blokus': blokus,
+    'tron': tron,
+    'test': test_game,
+    'tictactoe': tic_tac_toe(2),
+    'tictactoe_3p': tic_tac_toe(3),
+    'tictactoe_4p': tic_tac_toe(4)
 }
+
+
+def get_environment(environment):
+    return ENVIRONMENT_CLASSES[environment]()
+
+
+def available_environments():
+    return list(ENVIRONMENT_CLASSES.keys())
+
+
+

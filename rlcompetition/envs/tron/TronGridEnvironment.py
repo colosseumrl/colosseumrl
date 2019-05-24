@@ -2,7 +2,7 @@ import numpy as np
 from typing import Dict, Tuple, List, Union
 from dill import dumps, loads
 
-from rlcompetition.base_environment import BaseEnvironment
+from rlcompetition.BaseEnvironment import BaseEnvironment
 from .CyTronGrid import next_state_inplace, relative_player_inplace
 
 

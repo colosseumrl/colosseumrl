@@ -1,13 +1,13 @@
-from ..envs.blokus.blokus_env import BlokusEnv
-from ..envs.blokus.blokus_client_env import BlokusClientEnv
+from ..envs.blokus.BlokusEnvironment import BlokusEnvironment
+from ..envs.blokus.BlokusClientEnvironment import BlokusClientEnvironment
 from rlcompetition.rl_logging import init_logging
-from rlcompetition.client_environment import RLApp
+from rlcompetition.RLApp import RLApp
 import numpy as np
 from random import choice
 
 
-@RLApp("localhost", 7777, client_environment=BlokusClientEnv, server_environment=BlokusEnv, time_out=5)
-def main(ce: BlokusClientEnv):
+@RLApp("localhost", 7777, client_environment=BlokusClientEnvironment, server_environment=BlokusEnvironment, time_out=5)
+def main(ce: BlokusClientEnvironment):
     logger = init_logging()
 
     logger.debug("Connecting to server and waiting for game to start...")

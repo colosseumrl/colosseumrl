@@ -1,0 +1,9 @@
+scipy
+grpcio
+grpcio-tools
+Cython
+pygame
+numba
+numpy
+dill
+zmq

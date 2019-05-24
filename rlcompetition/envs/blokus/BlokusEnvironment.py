@@ -6,7 +6,7 @@ import numpy as np
 from . import gui
 from .ai import AI
 from .board import Board, PIECE_TYPES, ORIENTATIONS, BOARD_TO_PLAYER_OBSERVATION_ROTATION_MATRICES, PLAYER_OBSERVATION_TO_BOARD_ROTATION_MATRICES
-from rlcompetition.base_environment import BaseEnvironment
+from rlcompetition.BaseEnvironment import BaseEnvironment
 
 PLAYER_TO_COLOR = {
     0: 1,
@@ -185,7 +185,7 @@ def print_board(state: object):
     print(state[0].board_contents-1)
 
 
-class BlokusEnv(BaseEnvironment):
+class BlokusEnvironment(BaseEnvironment):
     r"""
     Full Blokus environment class with access to the actual game state.
     """

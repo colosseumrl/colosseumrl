@@ -1,9 +1,9 @@
+from typing import NamedTuple
+from hashlib import sha256
+
 import grpc
 from .grpc_gen.server_pb2 import QuickMatchRequest
 from .grpc_gen.server_pb2_grpc import MatchmakerStub
-
-from typing import NamedTuple
-from hashlib import sha256
 
 
 class GameResponse(NamedTuple):

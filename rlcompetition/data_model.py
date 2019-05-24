@@ -1,10 +1,11 @@
 """ Data types that will be used by the Spacetime backend. """
 
-from rtypes import pcc_set, merge
+from rtypes import pcc_set
 from rtypes import dimension, primarykey
 from typing import List, Dict
 import numpy as np
-import random, sys
+import random
+import sys
 
 
 def Observation(observation_names: List[str]):

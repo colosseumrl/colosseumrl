@@ -1,10 +1,10 @@
-from rlcompetition.client_environment import ClientEnv
+from rlcompetition.ClientEnvironment import ClientEnvironment
 
 from .TronGridEnvironment import ParseTronGridConfig, TronGridEnvironment
 
 
 # Stub for later
-class TronGridClientEnvironment(ClientEnv):
+class TronGridClientEnvironment(ClientEnvironment):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 

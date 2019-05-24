@@ -1,12 +1,12 @@
 from typing import Tuple, List, Dict
 
 from .ai import AI
-from .blokus_env import start_gui, terminate_gui, display_board
+from .BlokusEnvironment import start_gui, terminate_gui, display_board
 from .board import Board
-from rlcompetition.client_environment import ClientEnv
+from rlcompetition.ClientEnvironment import ClientEnvironment
 
 
-class BlokusClientEnv(ClientEnv):
+class BlokusClientEnvironment(ClientEnvironment):
 
     def __init__(self, *args, **kwargs):
         self._gui_is_active = False

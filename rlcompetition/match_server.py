@@ -11,9 +11,9 @@ from spacetime import Node, Dataframe
 
 from .data_model import ServerState, Player, _Observation, Observation
 from .rl_logging import init_logging, get_logger
-from .frame_rate_keeper import FrameRateKeeper
-from .base_environment import BaseEnvironment
-from .config import ENVIRONMENT_CLASSES
+from .FrameRateKeeper import FrameRateKeeper
+from .BaseEnvironment import BaseEnvironment
+from .config import get_environment, ENVIRONMENT_CLASSES
 from .util import log_params
 
 
@@ -266,7 +266,7 @@ if __name__ == '__main__':
 
     # env_class: Type[BaseEnvironment] = get_class(args.environment_class)
     try:
-        env_class: Type[BaseEnvironment] = ENVIRONMENT_CLASSES[args.environment]
+        env_class: Type[BaseEnvironment] = get_environment(args.environment)
     except KeyError:
         raise ValueError("The \'environment\' argument must must be chosen from the following list: {}".format(
             ENVIRONMENT_CLASSES.keys()

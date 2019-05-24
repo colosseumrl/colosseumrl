@@ -6,6 +6,7 @@ __pycache__/
 *$py.class
 
 Logs/
+*.sqlite
 
 .DS_Store
 rlcompetition/envs/tron/*.c

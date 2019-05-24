@@ -1,6 +1,6 @@
-from ..envs.blokus.blokus_env import BlokusEnv
-from ..envs.blokus.blokus_client_env import BlokusClientEnv
-from rlcompetition.client_environment import RLApp
+from ..envs.blokus.BlokusEnvironment import BlokusEnvironment
+from ..envs.blokus.BlokusClientEnvironment import BlokusClientEnvironment
+from rlcompetition.RLApp import RLApp
 from rlcompetition.rl_logging import init_logging
 import logging
 import numpy as np
@@ -28,8 +28,8 @@ def start_multiple_clients(server_hostname, server_port):
 def client_subproc_worker(remote, parent_remote, server_hostname, server_port):
     parent_remote.close()
 
-    @RLApp(server_hostname, server_port, client_environment=BlokusClientEnv, server_environment=BlokusEnv, time_out=10)
-    def run_client(ce: BlokusClientEnv):
+    @RLApp(server_hostname, server_port, client_environment=BlokusClientEnvironment, server_environment=BlokusEnvironment, time_out=10)
+    def run_client(ce: BlokusClientEnvironment):
 
         # Ensure every process has a different seed
         np.random.seed(os.getpid())

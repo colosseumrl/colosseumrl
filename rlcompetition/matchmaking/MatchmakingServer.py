@@ -10,19 +10,21 @@ from concurrent import futures
 from threading import Thread, Semaphore
 from multiprocessing import Event
 from typing import Type, Dict, List
+from spacetime import Node
+
+from rlcompetition.match_server import server_app
+from rlcompetition.data_model import ServerState, Player, _Observation, Observation
+from rlcompetition.config import get_environment, available_environments
+from rlcompetition.BaseEnvironment import BaseEnvironment
+from rlcompetition.util import is_port_in_use
+from rlcompetition.rl_logging import init_logging, get_logger
 
 from .grpc_gen.server_pb2 import QuickMatchReply, QuickMatchRequest
 from .grpc_gen.server_pb2_grpc import MatchmakerServicer, add_MatchmakerServicer_to_server
-from rlcompetition.match_server import server_app
-from rlcompetition.data_model import ServerState, Player, _Observation, Observation
+from .RankingDatabase import RankingDatabase
 
-from rlcompetition.config import ENVIRONMENT_CLASSES
-from rlcompetition.base_environment import BaseEnvironment
-from rlcompetition.util import is_port_in_use
-from rlcompetition.rl_logging import init_logging
-from rlcompetition.matchmaking import RankingDatabase
 
-from spacetime import Node
+logger = get_logger()
 
 
 def match_server_args_factory(tick_rate: int, realtime: bool, observations_only: bool, env_config_string: str):
@@ -214,12 +216,11 @@ def serve(args):
         hostname=args['hostname'],
         starting_port=args['game_port'],
         max_simultaneous_games=args['max_games'],
-        env_class=ENVIRONMENT_CLASSES[args['environment']],
+        env_class=get_environment(args['environment']),
         tick_rate=args['tick_rate'],
         realtime=args['realtime'],
         observations_only=args['observations_only'],
-        env_config_string=args['config'],
-
+        env_config_string=args['config']
     )
     matchmaker_thread.start()
 
@@ -248,11 +249,10 @@ def start_matchmaking_server(environment: str = 'test',
     serve(locals())
 
 
-if __name__ == '__main__':
-    logger = init_logging()
+def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--environment", "-e", type=str, default="test",
-                        help="The name of the environment. Choices are: {}".format(ENVIRONMENT_CLASSES.keys()))
+                        help="The name of the environment. Choices are: {}".format(available_environments()))
     parser.add_argument("--hostname", type=str, default='localhost',
                         help="Hostname to start the matchmaking and game servers on. Defaults to 'localhost'")
     parser.add_argument("--matchmaking-port", type=int, default=50051,
@@ -275,3 +275,8 @@ if __name__ == '__main__':
     command_line_args = parser.parse_args()
 
     serve(vars(command_line_args))
+
+
+if __name__ == '__main__':
+    logger = init_logging()
+    main()

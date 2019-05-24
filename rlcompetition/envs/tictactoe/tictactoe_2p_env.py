@@ -4,7 +4,7 @@ import dill
 import numpy as np
 import scipy.signal
 
-from rlcompetition.base_environment import BaseEnvironment
+from rlcompetition.BaseEnvironment import BaseEnvironment
 
 State = object
 

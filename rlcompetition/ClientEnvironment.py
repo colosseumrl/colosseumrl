@@ -1,20 +1,19 @@
+import dill
 import numpy as np
-import struct
-import pickle
+
+from time import sleep
+from typing import List, Type, Optional, Dict
+from spacetime import Dataframe
+
+from .BaseEnvironment import BaseEnvironment
+from .data_model import Observation, ServerState, Player
+from .FrameRateKeeper import FrameRateKeeper
+
 import logging
-
-from time import sleep, time
-from typing import Callable, Type, Optional, List, Dict
-
-from spacetime import Dataframe, Node
-from .data_model import ServerState, Player, Observation
-from .frame_rate_keeper import FrameRateKeeper
-from .base_environment import BaseEnvironment
-
 logger = logging.getLogger(__name__)
 
 
-class ClientEnv:
+class ClientEnvironment:
     _TickRate = 60
 
     def __init__(self,
@@ -85,7 +84,7 @@ class ClientEnv:
     def winners(self) -> Optional[List[int]]:
         """ The winners of the game. """
         assert self.is_connected
-        return pickle.loads(self._server_state.winners)
+        return dill.loads(self._server_state.winners)
 
     @property
     def server_environment(self) -> BaseEnvironment:
@@ -210,111 +209,10 @@ class ClientEnv:
         terminal = self.terminal
 
         if terminal:
-            winners = pickle.loads(self._server_state.winners)
+            winners = dill.loads(self._server_state.winners)
             self._player.acknowledges_game_over = True
             self.__push()
         else:
             winners = None
 
         return self.observation, reward, terminal, winners
-
-
-def client_app(dataframe: Dataframe,
-               app: "RLApp",
-               client_function: Callable,
-               observation_class: Type[Observation],
-               dimension_names: [str],
-               host: str,
-               auth_key: str,
-               *args, **kwargs):
-
-    client_env = app.client_environment(dataframe=dataframe,
-                                        dimensions=dimension_names,
-                                        observation_class=observation_class,
-                                        server_environment=app.server_environment,
-                                        host=host,
-                                        auth_key=auth_key)
-
-    client_function(client_env, *args, **kwargs)
-
-
-class RLApp:
-    def __init__(self,
-                 host: str,
-                 port: int,
-                 auth_key: str = '',
-                 client_environment: Type[ClientEnv] = ClientEnv,
-                 server_environment: Optional[Type[BaseEnvironment]] = None,
-                 time_out: int = 0):
-        self.client_environment = client_environment
-        self.server_environment = server_environment
-        self.host = host
-        self.port = port
-        self.auth_key = auth_key
-        self.time_out = time_out
-
-    def __call__(self, main_func: Callable):
-        # Get the dimensions required for the player dataframe
-        start_time = time()
-
-        while self.time_out == 0 or (time() - start_time) < self.time_out:
-            try:
-                while True:
-                    try:
-                        df = Dataframe("dimension_getter", [ServerState], details=(self.host, self.port))
-                    except ConnectionRefusedError as e:
-                        if (time() - start_time) > self.time_out:
-                            raise e
-                    else:
-                        break
-
-                df.pull()
-                df.checkout()
-
-                if df.read_all(ServerState)[0].server_no_longer_joinable:
-                    # This server is from an old game and just hasn't exited yet, wait for a new server.
-                    sleep(0.1)
-                    continue
-                else:
-                    break
-
-            except (ConnectionResetError, struct.error):
-                sleep(0.1)
-                continue
-
-        dimension_names: [str] = df.read_all(ServerState)[0].env_dimensions
-        observation_class = Observation(dimension_names)
-        del df
-
-        def app(*args, **kwargs):
-            client = Node(client_app,
-                          dataframe=(self.host, self.port),
-                          Types=[Player, observation_class, ServerState])
-            client.start(self, main_func, observation_class, dimension_names, self.host, self.auth_key, *args, **kwargs)
-
-        return app
-
-
-def create_rl_agent(agent_fn: Callable[[ClientEnv], None],
-                    host: str,
-                    port: int,
-                    auth_key: str = '',
-                    client_environment: Type[ClientEnv] = ClientEnv,
-                    server_environment: Optional[Type[BaseEnvironment]] = None,
-                    time_out: int = 0):
-    return RLApp(host, port, auth_key, client_environment, server_environment, time_out)(agent_fn)
-
-
-def launch_rl_agent(agent_fn: Callable[[ClientEnv], None],
-                    host: str,
-                    port: int,
-                    auth_key: str = '',
-                    client_environment: Type[ClientEnv] = ClientEnv,
-                    server_environment: Optional[Type[BaseEnvironment]] = None,
-                    time_out: int = 0,
-                    **kwargs):
-    return create_rl_agent(agent_fn, host, port, auth_key, client_environment, server_environment, time_out)(**kwargs)
-
-
-
-
