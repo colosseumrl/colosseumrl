@@ -7,6 +7,11 @@ __pycache__/
 
 Logs/
 
+.DS_Store
+rlcompetition/envs/tron/*.c
+rlcompetition/envs/tron/*.cpp
+rlcompetition/envs/tron/*.html
+
 # C extensions
 *.so
 
