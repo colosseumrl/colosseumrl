@@ -20,6 +20,7 @@ from rlcompetition.config import ENVIRONMENT_CLASSES
 from rlcompetition.base_environment import BaseEnvironment
 from rlcompetition.util import is_port_in_use
 from rlcompetition.rl_logging import init_logging
+from rlcompetition.matchmaking import RankingDatabase
 
 from spacetime import Node
 
@@ -65,14 +66,18 @@ class MatchProcessJanitor(Thread):
     def __init__(self,
                  match_limit: Semaphore,
                  ports_to_use_queue: Queue,
+                 database: RankingDatabase,
                  env_class: Type[BaseEnvironment],
                  match_server_args: Dict,
+                 player_list: List,
                  whitelist: List = None):
         super().__init__()
         self.match_limit = match_limit
         self.match_server_args = match_server_args
         self.env_class = env_class
         self.ports_to_use_queue = ports_to_use_queue
+        self.database = database
+        self.player_list = player_list
         self.whitelist = whitelist
         self.ready = Event()
 
@@ -85,13 +90,23 @@ class MatchProcessJanitor(Thread):
         app.start(self.env_class, observation_type, self.match_server_args, self.whitelist, self.ready)
         del app
 
+        # Cleanup
         self.ports_to_use_queue.put(port)
+        for user in self.player_list:
+            self.database.logoff(user)
+
         self.match_limit.release()
 
 
 class MatchmakingThread(Thread):
 
-    def __init__(self, starting_port, hostname, max_simultaneous_games, env_class, tick_rate, realtime,
+    def __init__(self,
+                 starting_port,
+                 hostname,
+                 max_simultaneous_games,
+                 env_class,
+                 tick_rate,
+                 realtime,
                  observations_only,
                  env_config_string):
         super().__init__()
@@ -128,6 +143,8 @@ class MatchmakingThread(Thread):
             raise OSError("Port range {} through {} does not have enough unallocated ports "
                           "to hold {} simultaneous games".format(starting_port, max_port, max_simultaneous_games))
 
+        self.database = RankingDatabase("test.sqlite")
+
     def run(self) -> None:
         match_requests = deque()
 
@@ -136,32 +153,57 @@ class MatchmakingThread(Thread):
             identity, _, serialized_request = self.socket.recv_multipart()
             request = QuickMatchRequest.FromString(serialized_request)
 
-            # Add them to the queue and generate a token for them
-            print("Got request from {}".format(request.username))
-            auth_key = secrets.token_hex(32)
-            match_requests.append((identity, request, auth_key))
+            # Login user and handle any errors
+            username, password = request.username, request.password
+            login_result = self.database.login(username, password)
+
+            if login_result == RankingDatabase.LoginResult.NoUser:
+                self.database.set(username, password)
+                self.database.login(username, password)
+
+            elif login_result == RankingDatabase.LoginResult.LoginDuplicate:
+                response = QuickMatchReply(username=username, server="FAIL", auth_key="FAIL", ranking=0.0,
+                                           response="Failed to login: Cannot login twice at the same time.")
+                self.socket.send_multipart((identity, b"", response.SerializeToString()))
+                continue
+
+            elif login_result == RankingDatabase.LoginResult.LoginFail:
+                response = QuickMatchReply(username=username, server="FAIL", auth_key="FAIL", ranking=0.0,
+                                           response="Failed to login: Wrong password.")
+                self.socket.send_multipart((identity, b"", response.SerializeToString()))
+                continue
+
+            # Add request to the queue and generate a token for them
+            match_requests.append((identity, request, secrets.token_hex(32)))
 
             # Once we have enough players for a game, start a game server and send the coordinates
             if len(match_requests) >= self.players_per_game:
                 self.match_limit.acquire()
                 new_players = [match_requests.pop() for _ in range(self.players_per_game)]
-
                 whitelist = [player[2] for player in new_players]
+                usernames = [player[1].username for player in new_players]
+
                 match_port = self.ports_to_use.get()
                 match_server_args = self.create_match_server_args(port=match_port)
-
                 match_janitor = MatchProcessJanitor(match_limit=self.match_limit,
                                                     ports_to_use_queue=self.ports_to_use,
+                                                    database=self.database,
                                                     env_class=self.env_class,
                                                     match_server_args=match_server_args,
+                                                    player_list=usernames,
                                                     whitelist=whitelist)
                 match_janitor.start()
+
+                database_entries = self.database.get_multi(*usernames)
+                database_entries = {name: ranking for name, _, ranking in database_entries}
                 match_janitor.ready.wait()
 
                 for identity, request, auth_key in new_players:
                     response = QuickMatchReply(username=request.username,
                                                server='{}:{}'.format(self.hostname, match_port),
-                                               auth_key=auth_key)
+                                               auth_key=auth_key,
+                                               ranking=database_entries[request.username],
+                                               response="")
 
                     self.socket.send_multipart((identity, b"", response.SerializeToString()))
 
@@ -192,6 +234,18 @@ def serve(args):
             time.sleep(one_day)
     except KeyboardInterrupt:
         server.stop(0)
+
+
+def start_matchmaking_server(environment: str = 'test',
+                             hostname: str = 'localhost',
+                             matchmaking_port: int = 50051,
+                             game_port: int = 21450,
+                             max_games: int = 1,
+                             tick_rate: int = 60,
+                             realtime: bool = False,
+                             observations_only: bool = False,
+                             config: str = ''):
+    serve(locals())
 
 
 if __name__ == '__main__':

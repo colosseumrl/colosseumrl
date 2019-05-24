@@ -20,7 +20,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='',
   syntax='proto3',
   serialized_options=None,
-  serialized_pb=_b('\n\x15grpc_gen/server.proto\"%\n\x11QuickMatchRequest\x12\x10\n\x08username\x18\x01 \x01(\t\"E\n\x0fQuickMatchReply\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x0e\n\x06server\x18\x02 \x01(\t\x12\x10\n\x08\x61uth_key\x18\x03 \x01(\t2@\n\nMatchmaker\x12\x32\n\x08GetMatch\x12\x12.QuickMatchRequest\x1a\x10.QuickMatchReply\"\x00\x62\x06proto3')
+  serialized_pb=_b('\n\x15grpc_gen/server.proto\"7\n\x11QuickMatchRequest\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x10\n\x08password\x18\x02 \x01(\x0c\"h\n\x0fQuickMatchReply\x12\x10\n\x08username\x18\x01 \x01(\t\x12\x0e\n\x06server\x18\x02 \x01(\t\x12\x10\n\x08\x61uth_key\x18\x03 \x01(\t\x12\x0f\n\x07ranking\x18\x04 \x01(\x01\x12\x10\n\x08response\x18\x05 \x01(\t2@\n\nMatchmaker\x12\x32\n\x08GetMatch\x12\x12.QuickMatchRequest\x1a\x10.QuickMatchReply\"\x00\x62\x06proto3')
 )
 
 
@@ -40,6 +40,13 @@ _QUICKMATCHREQUEST = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='password', full_name='QuickMatchRequest.password', index=1,
+      number=2, type=12, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b(""),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -53,7 +60,7 @@ _QUICKMATCHREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=25,
-  serialized_end=62,
+  serialized_end=80,
 )
 
 
@@ -85,6 +92,20 @@ _QUICKMATCHREPLY = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='ranking', full_name='QuickMatchReply.ranking', index=3,
+      number=4, type=1, cpp_type=5, label=1,
+      has_default_value=False, default_value=float(0),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
+    _descriptor.FieldDescriptor(
+      name='response', full_name='QuickMatchReply.response', index=4,
+      number=5, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=_b("").decode('utf-8'),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      serialized_options=None, file=DESCRIPTOR),
   ],
   extensions=[
   ],
@@ -97,8 +118,8 @@ _QUICKMATCHREPLY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=64,
-  serialized_end=133,
+  serialized_start=82,
+  serialized_end=186,
 )
 
 DESCRIPTOR.message_types_by_name['QuickMatchRequest'] = _QUICKMATCHREQUEST
@@ -127,8 +148,8 @@ _MATCHMAKER = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=135,
-  serialized_end=199,
+  serialized_start=188,
+  serialized_end=252,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetMatch',
