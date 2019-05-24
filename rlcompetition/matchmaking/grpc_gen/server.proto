@@ -9,6 +9,7 @@ service Matchmaker {
 // The request message containing the user's name.
 message QuickMatchRequest {
   string username = 1;
+  bytes password = 2;
 }
 
 // The response message containing the greetings
@@ -16,4 +17,6 @@ message QuickMatchReply {
   string username = 1;
   string server = 2;
   string auth_key = 3;
+  double ranking = 4;
+  string response = 5;
 }

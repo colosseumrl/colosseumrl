@@ -1,4 +1,4 @@
-from rlcompetition.matchmaking_server import request_game
+from rlcompetition.matchmaking import request_game
 from rlcompetition.client_environment import create_rl_agent
 from rlcompetition.envs.tron import TronGridClientEnvironment
 from rlcompetition.envs.tron import TronGridEnvironment
