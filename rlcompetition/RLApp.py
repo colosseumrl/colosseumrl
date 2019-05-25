@@ -6,9 +6,8 @@ from typing import Callable, Type, Optional
 from spacetime import Dataframe, Node
 
 from .data_model import ServerState, Player, Observation
-from .ClientEnvironment import ClientEnvironment
 from .BaseEnvironment import BaseEnvironment
-
+from .ClientEnvironment import ClientEnvironment
 
 logger = logging.getLogger(__name__)
 

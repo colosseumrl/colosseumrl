@@ -1,9 +1,10 @@
 """ Abstract definition of a game environment. Whenever you wish to make a new environment, make sure to subclass
 this to have all of the correct functions. """
 
+import numpy as np
+
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Union, Dict
-import numpy as np
 
 
 class BaseEnvironment(ABC):
@@ -51,7 +52,7 @@ class BaseEnvironment(ABC):
         new_state : np.ndarray
             A state for the new game.
         new_players: [int]
-            List of players whos turn it is now.
+            List of players who's turn it is now.
         """
         raise NotImplementedError
 
@@ -85,7 +86,7 @@ class BaseEnvironment(ABC):
         new_state : object
             The new state of the game.
         new_players: [int]
-            List of players whos turn it is in the new state now.
+            List of players who's turn it is in the new state now.
         rewards : [float]
             The reward for each player that acted.
         terminal : bool

@@ -1,12 +1,13 @@
 """ Monolithic game server function. This file contains all the backend logic to execute moves and
 push the observations to the agents. """
 
+import dill
 import argparse
-import pickle
+
 from multiprocessing import Event
 from typing import Type, Dict, List, NamedTuple
+from time import sleep
 
-import spacetime
 from spacetime import Node, Dataframe
 
 from .data_model import ServerState, Player, _Observation, Observation
@@ -27,7 +28,7 @@ class Timeout(NamedTuple):
     end: float = 10.0
 
 
-def server_app(dataframe: spacetime.Dataframe,
+def server_app(dataframe: Dataframe,
                env_class: Type[BaseEnvironment],
                observation_type: Type,
                args: dict,
@@ -52,6 +53,13 @@ def server_app(dataframe: spacetime.Dataframe,
     dataframe.add_one(ServerState, server_state)
     dataframe.commit()
 
+    # Function to help clean up server if it ever needs to shutdown
+    def close_server(message: str):
+        server_state.terminal = True
+        logger.error(message)
+        dataframe.commit()
+        sleep(5)
+
     # Create the environment and start the server
     env: BaseEnvironment = env_class(args["config"])
 
@@ -72,8 +80,8 @@ def server_app(dataframe: spacetime.Dataframe,
     fr.start_timeout(timeout.connect)
     while len(players) < env.min_players:
         if fr.tick():
-            logger.error("Game could not find enough players in the alloted time. Shutting down game server.")
-            return -1
+            close_server("Game could not find enough players. Shutting down game server.")
+            return 1
 
         dataframe.sync()
         new_players: Dict[int, Player] = dict((p.pid, p) for p in dataframe.read_all(Player))
@@ -85,11 +93,13 @@ def server_app(dataframe: spacetime.Dataframe,
 
             if whitelist_used and auth_key not in whitelist_connected:
                 logger.info("Player tried to join with invalid authentication_key: {}".format(name))
+                dataframe.delete_one(Player, new_id)
                 del new_players[new_id]
                 continue
 
             if whitelist_used and whitelist_connected[auth_key]:
                 logger.info("Player tried to join twice with the same authentication_key: {}".format(name))
+                dataframe.delete_one(Player, new_id)
                 del new_players[new_id]
                 continue
 
@@ -121,6 +131,7 @@ def server_app(dataframe: spacetime.Dataframe,
     # Create all of the player data and wait for the game to begin
     # -----------------------------------------------------------------------------------------------
     logger.info("Finalizing players and setting up new environment.")
+    server_state.server_no_longer_joinable = True
 
     # Create the initial state for the environment and push it if enabled
     state, player_turns = env.new_state(num_players=len(players))
@@ -146,8 +157,8 @@ def server_app(dataframe: spacetime.Dataframe,
     fr.start_timeout(timeout.start)
     while not all(player.ready_for_start for player in players.values()):
         if fr.tick():
-            logger.error("Players have dropped out between entering the game and starting the game.")
-            return -2
+            close_server("Players have dropped out between entering the game and starting the game.")
+            return 2
 
         dataframe.checkout()
 
@@ -156,8 +167,7 @@ def server_app(dataframe: spacetime.Dataframe,
     # -----------------------------------------------------------------------------------------------
     logger.info("Game started...")
     terminal = False
-
-    server_state.server_no_longer_joinable = True
+    winners = None
     dataframe.commit()
 
     fr.start_timeout(timeout.move)
@@ -168,13 +178,12 @@ def server_app(dataframe: spacetime.Dataframe,
         # Get new data
         dataframe.checkout()
 
-        # Get the player dataframes of the players whos turn it is right now
+        # Get the player dataframes of the players who's turn it is right now
         current_players: List[Player] = [p for p in players.values() if p.number in player_turns]
         current_actions: List[str] = []
 
-        if (not args['realtime'] and
-            not move_timeout and
-            not all(p.ready_for_action_to_be_taken for p in current_players)):
+        ready = args['realtime'] or move_timeout or all(p.ready_for_action_to_be_taken for p in current_players)
+        if not ready:
             continue
 
         # Queue up each players action if it is legal
@@ -211,7 +220,7 @@ def server_app(dataframe: spacetime.Dataframe,
 
         if terminal:
             server_state.terminal = True
-            server_state.winners = pickle.dumps(winners)
+            server_state.winners = dill.dumps(winners)
             for player_number in winners:
                 players_by_number[player_number].winner = True
             logger.info("Player: {} won the game.".format(winners))
@@ -240,6 +249,8 @@ def server_app(dataframe: spacetime.Dataframe,
             dataframe.checkout()
 
     logger.info("Game has ended. Player {} is the winner.".format(dataframe.read_one(ServerState, server_state.oid)))
+
+    return [players_by_number[player_number].name for player_number in winners]
 
 
 if __name__ == '__main__':
@@ -280,4 +291,3 @@ if __name__ == '__main__':
                    Types=[Player, ServerState])
         app.start(env_class, observation_type, vars(args))
         del app
-

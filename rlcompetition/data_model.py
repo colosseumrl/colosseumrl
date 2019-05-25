@@ -1,15 +1,17 @@
 """ Data types that will be used by the Spacetime backend. """
 
+import sys
+import random
+import numpy as np
+
 from rtypes import pcc_set
 from rtypes import dimension, primarykey
 from typing import List, Dict
-import numpy as np
-import random
-import sys
 
 
 def Observation(observation_names: List[str]):
     """ Creates a proper player class with the attributes necessary to transfer the observations. """
+
     class Observation(_Observation):
         pass
 
@@ -20,6 +22,7 @@ def Observation(observation_names: List[str]):
 
 
 class _Observation:
+    """ Base observation class that specific observations will be created from. """
     pid = primarykey(int)
 
     def __init__(self, pid: int):
@@ -34,18 +37,19 @@ class Player(object):
     pid = primarykey(int)
     authentication_key = dimension(str)
 
-    number = dimension(int)
     name = dimension(str)
+    number = dimension(int)
     observation_port = dimension(int)
 
     action = dimension(str)
-    ready_for_start = dimension(bool)
-    ready_for_action_to_be_taken = dimension(bool)
-    turn = dimension(bool)
     reward_from_last_turn = dimension(float)
 
-    acknowledges_game_over = dimension(bool)
+    turn = dimension(bool)
+    ready_for_start = dimension(bool)
+    ready_for_action_to_be_taken = dimension(bool)
+
     winner = dimension(bool)
+    acknowledges_game_over = dimension(bool)
 
     def __init__(self, name, auth_key: str = ""):
         self.pid = random.randint(0, sys.maxsize)

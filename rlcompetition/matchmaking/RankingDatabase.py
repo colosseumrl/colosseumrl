@@ -1,6 +1,6 @@
-import sqlite3
-from threading import Lock
 from enum import Enum
+from threading import Lock
+from sqlite3 import connect as connect_database
 
 
 class LoginResult(Enum):
@@ -15,7 +15,7 @@ class RankingDatabase:
 
     def __init__(self, database_file: str):
         self.filepath: str = database_file
-        self.__db = sqlite3.connect(database_file, check_same_thread=False)
+        self.__db = connect_database(database_file, check_same_thread=False)
         self.__db_lock = Lock()
         self.__logged_in = set()
 
@@ -34,7 +34,7 @@ class RankingDatabase:
             result = cursor.execute("SELECT * FROM userz WHERE username=?", (username, ))
             return result.fetchone()
 
-    def get_multi(self, *args):
+    def get_multi(self, *args) -> [(str, str, float)]:
         cursor = self.__db.cursor()
         with self.__db_lock:
             query = "SELECT * FROM userz WHERE username IN ({})".format(', '.join('?' for _ in args))
@@ -68,4 +68,5 @@ class RankingDatabase:
         with self.__db_lock:
             self.__logged_in.remove(username)
 
-
+    def update_ranking(self, usernames: [str], winners: [str]):
+        pass

@@ -1,4 +1,4 @@
-from rlcompetition.matchmaking import request_game
+from rlcompetition.matchmaking import request_game, GameResponse
 from rlcompetition.RLApp import create_rl_agent
 from rlcompetition.envs.tron import TronGridClientEnvironment
 from rlcompetition.envs.tron import TronGridEnvironment
@@ -39,8 +39,9 @@ def tron_client(env: TronGridClientEnvironment, username: str):
 if __name__ == '__main__':
     logger.debug("Connecting to matchmaking server. Waiting for a game to be created.")
     username = "SwagMaster_{}".format(randint(0, 1024))
-    game = request_game("localhost", 50051, username)
+    game: GameResponse = request_game("localhost", 50051, username)
     logger.debug("Game has been created. Playing as {}".format(username))
+    logger.debug("Current Ranking: {}".format(game.ranking))
 
     agent = create_rl_agent(tron_client, game.host, game.port, game.token, TronGridClientEnvironment, TronGridEnvironment)
     agent(username)

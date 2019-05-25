@@ -12,12 +12,12 @@ from multiprocessing import Event
 from typing import Type, Dict, List
 from spacetime import Node
 
-from rlcompetition.match_server import server_app
-from rlcompetition.data_model import ServerState, Player, _Observation, Observation
-from rlcompetition.config import get_environment, available_environments
-from rlcompetition.BaseEnvironment import BaseEnvironment
-from rlcompetition.util import is_port_in_use
-from rlcompetition.rl_logging import init_logging, get_logger
+from ..match_server import server_app
+from ..data_model import ServerState, Player, Observation
+from ..config import get_environment, available_environments
+from ..BaseEnvironment import BaseEnvironment
+from ..util import is_port_in_use
+from ..rl_logging import init_logging, get_logger
 
 from .grpc_gen.server_pb2 import QuickMatchReply, QuickMatchRequest
 from .grpc_gen.server_pb2_grpc import MatchmakerServicer, add_MatchmakerServicer_to_server
@@ -85,19 +85,21 @@ class MatchProcessJanitor(Thread):
 
     def run(self) -> None:
         port = self.match_server_args['port']
-        observation_type: Type[_Observation] = Observation(self.env_class.observation_names())
+        observation_type = Observation(self.env_class.observation_names())
 
         # App blocks until the server has ended
         app = Node(server_app, server_port=port, Types=[Player, ServerState])
-        app.start(self.env_class, observation_type, self.match_server_args, self.whitelist, self.ready)
+        winners = app.start(self.env_class, observation_type, self.match_server_args, self.whitelist, self.ready)
         del app
 
         # Cleanup
         self.ports_to_use_queue.put(port)
+        self.match_limit.release()
+
+        # Update player information
+        self.database.update_ranking(self.player_list, winners)
         for user in self.player_list:
             self.database.logoff(user)
-
-        self.match_limit.release()
 
 
 class MatchmakingThread(Thread):
