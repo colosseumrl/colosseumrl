@@ -92,14 +92,16 @@ class MatchProcessJanitor(Thread):
         rankings = app.start(self.env_class, observation_type, self.match_server_args, self.whitelist, self.ready)
         del app
 
+        # Update player information
+        if isinstance(rankings, dict):
+            self.database.update_ranking(rankings)
+
+        for user in self.player_list:
+            self.database.logoff(user)
+
         # Cleanup
         self.ports_to_use_queue.put(port)
         self.match_limit.release()
-
-        # Update player information
-        self.database.update_ranking(rankings)
-        for user in self.player_list:
-            self.database.logoff(user)
 
 
 class MatchmakingThread(Thread):
