@@ -47,6 +47,8 @@ class BaseEnvironment(ABC):
     def new_state(self, num_players: int = None) -> Tuple[object, List[int]]:
         """ Create a fresh state. This could return a fixed object or randomly initialized on, depending on the game.
 
+        Note that player numbers must be numbers in the set {0, 1, ..., n-1} for an n player game.
+
         Returns
         -------
         new_state : np.ndarray
@@ -72,6 +74,8 @@ class BaseEnvironment(ABC):
         """
         Compute a single step in the game.
 
+        Note that player numbers must be numbers in the set {0, 1, ..., n-1} for an n player game.
+
         Parameters
         ----------
         state : object
@@ -96,6 +100,28 @@ class BaseEnvironment(ABC):
         """
         raise NotImplementedError
 
+    def compute_ranking(self, state: object, players: [int], winners: [int]) -> Dict[int, int]:
+        """ OPTIONAL
+
+        Compute the final ranking of all of the players in the game. The state object will be a terminal object.
+        By default, this will simply give a list of players that won with a ranking 0 and losers with ranking 1.
+
+        Parameters
+        ----------
+        state: object
+            Terminal state of the game, right after the final move.
+        players: [int]
+            A list of all players in the game
+        winners: [int]
+            A list of final winners in the game.
+
+        Returns
+        -------
+        A Dictionary mapping player number to of rankings for each player. Lower rankings indicating better placement.
+        """
+        winner_set = set(winners)
+        return {player: (0 if player in winner_set else 1) for player in players}
+
     @abstractmethod
     def valid_actions(self, state: object, player: int) -> [str]:
         """ Valid actions for a specific state. """
@@ -103,7 +129,7 @@ class BaseEnvironment(ABC):
 
     @abstractmethod
     def is_valid_action(self, state: object, player: int, action: str) -> bool:
-        """ Valid actions for a specific state. """
+        """ Whether or not an action is valid for a specific state. """
         raise NotImplementedError
 
     @abstractmethod
@@ -111,6 +137,7 @@ class BaseEnvironment(ABC):
         """ Convert the raw game state to the observation for the agent. Maps each observation name into an observation.
 
         This can return different values for the different players. Default implementation is just the identity."""
+        raise NotImplementedError
 
     # Serialization Methods
     @staticmethod

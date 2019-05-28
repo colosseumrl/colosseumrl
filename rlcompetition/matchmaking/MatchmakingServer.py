@@ -89,7 +89,7 @@ class MatchProcessJanitor(Thread):
 
         # App blocks until the server has ended
         app = Node(server_app, server_port=port, Types=[Player, ServerState])
-        winners = app.start(self.env_class, observation_type, self.match_server_args, self.whitelist, self.ready)
+        rankings = app.start(self.env_class, observation_type, self.match_server_args, self.whitelist, self.ready)
         del app
 
         # Cleanup
@@ -97,7 +97,7 @@ class MatchProcessJanitor(Thread):
         self.match_limit.release()
 
         # Update player information
-        self.database.update_ranking(self.player_list, winners)
+        self.database.update_ranking(rankings)
         for user in self.player_list:
             self.database.logoff(user)
 
@@ -199,7 +199,7 @@ class MatchmakingThread(Thread):
                 match_janitor.start()
 
                 database_entries = self.database.get_multi(*usernames)
-                database_entries = {name: ranking for name, _, ranking in database_entries}
+                database_entries = {name: ranking for name, _, ranking, _ in database_entries}
                 match_janitor.ready.wait()
 
                 for identity, request, auth_key in new_players:

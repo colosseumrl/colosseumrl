@@ -179,7 +179,7 @@ class TronGridEnvironment(BaseEnvironment):
     @staticmethod
     def serializable() -> bool:
         """ Whether or not this class supports serialization of the state."""
-        return True
+        return False
 
     @staticmethod
     def serialize_state(state: object) -> bytearray:

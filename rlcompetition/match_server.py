@@ -250,7 +250,8 @@ def server_app(dataframe: Dataframe,
 
     logger.info("Game has ended. Player {} is the winner.".format(dataframe.read_one(ServerState, server_state.oid)))
 
-    return [players_by_number[player_number].name for player_number in winners]
+    rankings = env.compute_ranking(state, list(range(len(players))), winners)
+    return {players_by_number[number].name: ranking for number, ranking in rankings.items()}
 
 
 if __name__ == '__main__':
