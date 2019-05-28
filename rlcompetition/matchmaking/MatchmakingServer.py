@@ -4,8 +4,7 @@ import grpc
 import argparse
 import zmq
 
-from queue import Queue
-from collections import deque
+from queue import Queue, Empty
 from concurrent import futures
 from threading import Thread, Semaphore
 from multiprocessing import Event
@@ -49,15 +48,24 @@ class MatchMakingHandler(MatchmakerServicer):
         Clients will connect to the server and call this function to request a match. """
 
     def GetMatch(self, request, context):
-        # Prepare ZeroMQ connection
-        # We use ZeroMQ to communicate between the handler and the matchmaking server
+        # Unique identity for this connection
+        identity = request.username.encode() + secrets.token_bytes(16)
+
+        # Prepare ZeroMQ connection to get added to the queue
         context = zmq.Context()
         socket = context.socket(zmq.REQ)
-        socket.connect("ipc://matchmaker_requests")
+        socket.connect("ipc://matchmaker_requests.ipc")
 
-        # Request a new match
-        # print(request.SerializeToString(), QuickMatchRequest.FromString(request.SerializeToString()))
-        socket.send(request.SerializeToString())
+        # Wait until we are added to the queue
+        socket.send_multipart((identity, request.SerializeToString()))
+        status, response = socket.recv_multipart()
+        if status == b"FAIL":
+            return QuickMatchReply.FromString(response)
+
+        # Wait until we are assigned a game
+        socket = context.socket(zmq.DEALER)
+        socket.setsockopt(zmq.IDENTITY, identity)
+        socket.connect("ipc://matchmaker_responses.ipc")
         return QuickMatchReply.FromString(socket.recv())
 
 
@@ -104,6 +112,49 @@ class MatchProcessJanitor(Thread):
         self.match_limit.release()
 
 
+class MatchmakingLoginThread(Thread):
+    def __init__(self, connection_queue: Queue, database: RankingDatabase):
+        super().__init__()
+
+        self.queue: Queue = connection_queue
+        self.database: RankingDatabase = database
+        self.daemon = True
+
+        context = zmq.Context()
+        self.socket = context.socket(zmq.REP)
+        self.socket.bind("ipc://matchmaker_requests.ipc")
+        print("Matchmaker Connector thread listening...")
+
+    def run(self):
+        while True:
+            identity, serialized_request = self.socket.recv_multipart()
+            request = QuickMatchRequest.FromString(serialized_request)
+
+            # Login user and handle any errors
+            username, password = request.username, request.password
+            login_result = self.database.login(username, password)
+
+            if login_result == RankingDatabase.LoginResult.NoUser:
+                self.database.set(username, password)
+                self.database.login(username, password)
+
+            elif login_result == RankingDatabase.LoginResult.LoginDuplicate:
+                response = QuickMatchReply(username=username, server="FAIL", auth_key="FAIL", ranking=0.0,
+                                           response="Failed to login: Cannot login twice at the same time.")
+                self.socket.send_multipart((b"FAIL", response.SerializeToString()))
+                continue
+
+            elif login_result == RankingDatabase.LoginResult.LoginFail:
+                response = QuickMatchReply(username=username, server="FAIL", auth_key="FAIL", ranking=0.0,
+                                           response="Failed to login: Wrong password.")
+                self.socket.send_multipart((b"FAIL", response.SerializeToString()))
+                continue
+
+            # Add request to the queue and generate a token for them
+            self.queue.put((identity, request, secrets.token_hex(32)))
+            self.socket.send_multipart((b"SUCCESS", b""))
+
+
 class MatchmakingThread(Thread):
 
     def __init__(self,
@@ -120,11 +171,12 @@ class MatchmakingThread(Thread):
         self.players_per_game = env_class(env_config_string).min_players
         self.env_class = env_class
         self.hostname = hostname
+        self.daemon = True
 
         # Prepare our context and sockets
         context = zmq.Context()
         self.socket = context.socket(zmq.ROUTER)
-        self.socket.bind("ipc://matchmaker_requests")
+        self.socket.bind("ipc://matchmaker_responses.ipc")
         print("Matchmaker thread listening...")
 
         # Semaphore for tracking the total number of games running
@@ -151,44 +203,41 @@ class MatchmakingThread(Thread):
 
         self.database = RankingDatabase("test.sqlite")
 
+        self.connection_queue = Queue()
+        self.connection_thread = MatchmakingLoginThread(self.connection_queue, self.database)
+
+    def start(self) -> None:
+        super().start()
+        self.connection_thread.start()
+
+    def select_players(self, requests):
+        return [requests.pop(0) for _ in range(self.players_per_game)]
+
     def run(self) -> None:
-        match_requests = deque()
+        requests = []
 
         while True:
-            # Grab a new request
-            identity, _, serialized_request = self.socket.recv_multipart()
-            request = QuickMatchRequest.FromString(serialized_request)
-
-            # Login user and handle any errors
-            username, password = request.username, request.password
-            login_result = self.database.login(username, password)
-
-            if login_result == RankingDatabase.LoginResult.NoUser:
-                self.database.set(username, password)
-                self.database.login(username, password)
-
-            elif login_result == RankingDatabase.LoginResult.LoginDuplicate:
-                response = QuickMatchReply(username=username, server="FAIL", auth_key="FAIL", ranking=0.0,
-                                           response="Failed to login: Cannot login twice at the same time.")
-                self.socket.send_multipart((identity, b"", response.SerializeToString()))
-                continue
-
-            elif login_result == RankingDatabase.LoginResult.LoginFail:
-                response = QuickMatchReply(username=username, server="FAIL", auth_key="FAIL", ranking=0.0,
-                                           response="Failed to login: Wrong password.")
-                self.socket.send_multipart((identity, b"", response.SerializeToString()))
-                continue
-
-            # Add request to the queue and generate a token for them
-            match_requests.append((identity, request, secrets.token_hex(32)))
+            # Wait for any new requests, and always recheck request queue after 5 seconds
+            # This will be useful if we have a robust matchmaking system with rankings
+            try:
+                requests.append(self.connection_queue.get(timeout=5.0))
+            except Empty:
+                pass
+            else:
+                while not self.connection_queue.empty():
+                    requests.append(self.connection_queue.get())
 
             # Once we have enough players for a game, start a game server and send the coordinates
-            if len(match_requests) >= self.players_per_game:
+            if len(requests) >= self.players_per_game:
+                # Limit the number of games so we dont overload server
                 self.match_limit.acquire()
-                new_players = [match_requests.pop() for _ in range(self.players_per_game)]
+
+                # Select Players using arbitrary method
+                new_players = self.select_players(requests)
                 whitelist = [player[2] for player in new_players]
                 usernames = [player[1].username for player in new_players]
 
+                # Create the game server
                 match_port = self.ports_to_use.get()
                 match_server_args = self.create_match_server_args(port=match_port)
                 match_janitor = MatchProcessJanitor(match_limit=self.match_limit,
@@ -204,6 +253,7 @@ class MatchmakingThread(Thread):
                 database_entries = {name: ranking for name, _, ranking, _ in database_entries}
                 match_janitor.ready.wait()
 
+                # Send each player their assigned server.
                 for identity, request, auth_key in new_players:
                     response = QuickMatchReply(username=request.username,
                                                server='{}:{}'.format(self.hostname, match_port),
@@ -211,7 +261,7 @@ class MatchmakingThread(Thread):
                                                ranking=database_entries[request.username],
                                                response="")
 
-                    self.socket.send_multipart((identity, b"", response.SerializeToString()))
+                    self.socket.send_multipart((identity, response.SerializeToString()))
 
 
 def serve(args):
