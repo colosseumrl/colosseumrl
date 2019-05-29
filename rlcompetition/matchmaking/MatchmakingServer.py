@@ -177,7 +177,7 @@ class MatchmakingThread(Thread):
         context = zmq.Context()
         self.socket = context.socket(zmq.ROUTER)
         self.socket.bind("ipc://matchmaker_responses.ipc")
-        print("Matchmaker thread listening...")
+        logger.info("Matchmaker thread listening at grpc://{}:{}...".format(self.hostname, self.ports_to_use))
 
         # Semaphore for tracking the total number of games running
         self.match_limit = Semaphore(max_simultaneous_games)
