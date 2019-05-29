@@ -179,7 +179,7 @@ class MatchmakingThread(Thread):
         context = zmq.Context()
         self.socket = context.socket(zmq.ROUTER)
         self.socket.bind("ipc://matchmaker_responses.ipc")
-        print("Matchmaker thread listening...")
+        logger.info("Matchmaker thread running")
 
         # Semaphore for tracking the total number of games running
         self.match_limit = Semaphore(max_simultaneous_games)
@@ -285,6 +285,7 @@ def serve(args):
     add_MatchmakerServicer_to_server(MatchMakingHandler(), server)
     server.add_insecure_port('[::]:{}'.format(args['matchmaking_port']))
     server.start()
+    logger.info("Match making server listening on grpc://{}:{}...".format(args['hostname'], args['matchmaking_port']))
     try:
         one_day = 3600 * 24
         while True:
