@@ -57,5 +57,5 @@ def request_game(hostname: str, port: int, username: str, password: str = "") ->
     if response.server == "FAIL":
         raise ConnectionError("Could not connect to matchmaking server. Error message: {}".format(response.response))
 
-    host, port = response.server.split(":")
-    return GameResponse(host, int(port), username, response.auth_key, response.ranking)
+    _, port = response.server.split(":")
+    return GameResponse(hostname, int(port), username, response.auth_key, response.ranking)

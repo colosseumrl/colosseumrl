@@ -6,7 +6,7 @@ from rlcompetition.envs.tron import TronGridEnvironment
 from rlcompetition.rl_logging import init_logging
 
 from random import choice, randint
-
+import argparse
 
 logger = init_logging()
 
@@ -37,9 +37,24 @@ def tron_client(env: TronGridClientEnvironment, username: str):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--host", "-s", type=str, default="localhost",
+                        help="Hostname of the matchmaking server.")
+    parser.add_argument("--port", "-p", type=int, default=50051,
+                        help="Port the matchmaking server is running on.")
+    parser.add_argument("--username", "-u", type=str, default="",
+                        help="Desired username to use for your connection. By default it will generate a random one.")
+
     logger.debug("Connecting to matchmaking server. Waiting for a game to be created.")
-    username = "SwagMaster_{}".format(randint(0, 1024))
-    game: GameResponse = request_game("localhost", 50051, username)
+
+    args = parser.parse_args()
+
+    if args.username == "":
+        username = "SwagMaster_{}".format(randint(0, 1024))
+    else:
+        username = args.username
+
+    game: GameResponse = request_game(args.host, args.port, username)
     logger.debug("Game has been created. Playing as {}".format(username))
     logger.debug("Current Ranking: {}".format(game.ranking))
 

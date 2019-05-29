@@ -66,7 +66,9 @@ class MatchMakingHandler(MatchmakerServicer):
         socket = context.socket(zmq.DEALER)
         socket.setsockopt(zmq.IDENTITY, identity)
         socket.connect("ipc://matchmaker_responses.ipc")
-        return QuickMatchReply.FromString(socket.recv())
+
+        response = QuickMatchReply.FromString(socket.recv())
+        return response
 
 
 class MatchProcessJanitor(Thread):
