@@ -9,6 +9,7 @@ from concurrent import futures
 from threading import Thread, Semaphore
 from multiprocessing import Event
 from typing import Type, Dict, List
+from collections import OrderedDict
 from spacetime import Node
 
 from ..match_server import server_app
@@ -52,8 +53,8 @@ class MatchMakingHandler(MatchmakerServicer):
         identity = request.username.encode() + secrets.token_bytes(16)
 
         # Prepare ZeroMQ connection to get added to the queue
-        context = zmq.Context()
-        socket = context.socket(zmq.REQ)
+        zmq_context = zmq.Context()
+        socket: zmq.Socket = zmq_context.socket(zmq.REQ)
         socket.connect("ipc://matchmaker_requests.ipc")
 
         # Wait until we are added to the queue
@@ -63,11 +64,20 @@ class MatchMakingHandler(MatchmakerServicer):
             return QuickMatchReply.FromString(response)
 
         # Wait until we are assigned a game
-        socket = context.socket(zmq.DEALER)
+        socket = zmq_context.socket(zmq.DEALER)
         socket.setsockopt(zmq.IDENTITY, identity)
         socket.connect("ipc://matchmaker_responses.ipc")
 
-        response = QuickMatchReply.FromString(socket.recv())
+        while True:
+            if socket.poll(timeout=1000) == 0:
+                # check if still connected
+                if not context.is_active():
+                    socket.send(identity)
+                    return None
+            else:
+                break
+
+        response = QuickMatchReply.FromString(socket.recv(flags=zmq.NOBLOCK))
         return response
 
 
@@ -213,21 +223,40 @@ class MatchmakingThread(Thread):
         self.connection_thread.start()
 
     def select_players(self, requests):
-        return [requests.pop(0) for _ in range(self.players_per_game)]
+        players = []
+        for _ in range(self.players_per_game):
+            identity, (request, auth) = requests.pop(last=False)
+            players.append((identity, request, auth))
+        return players
 
     def run(self) -> None:
-        requests = []
+        requests = OrderedDict()
 
         while True:
             # Wait for any new requests, and always recheck request queue after 5 seconds
             # This will be useful if we have a robust matchmaking system with rankings
             try:
-                requests.append(self.connection_queue.get(timeout=5.0))
+                identity, request, authorization = self.connection_queue.get(timeout=5.0)
+                requests[identity] = (request, authorization)
             except Empty:
                 pass
             else:
                 while not self.connection_queue.empty():
-                    requests.append(self.connection_queue.get())
+                    identity, request, authorization = self.connection_queue.get()
+                    requests[identity] = (request, authorization)
+
+            # Check if any clients have disconnected
+            while True:
+                try:
+                    quitting_identity = self.socket.recv(flags=zmq.NOBLOCK)
+                except zmq.ZMQError:
+                    break
+                else:
+                    logger.debug("Player {} quit the matchmaking queue".format(quitting_identity))
+                    try:
+                        del requests[quitting_identity]
+                    except KeyError:
+                        pass
 
             # Once we have enough players for a game, start a game server and send the coordinates
             if len(requests) >= self.players_per_game:
@@ -285,7 +314,7 @@ def serve(args):
     add_MatchmakerServicer_to_server(MatchMakingHandler(), server)
     server.add_insecure_port('[::]:{}'.format(args['matchmaking_port']))
     server.start()
-    logger.info("Match making server listening on grpc://{}:{}...".format(args['hostname'], args['matchmaking_port']))
+    logger.info("Matchmaking server listening on grpc://{}:{}...".format(args['hostname'], args['matchmaking_port']))
     try:
         one_day = 3600 * 24
         while True:
