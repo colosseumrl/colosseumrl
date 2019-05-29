@@ -50,35 +50,36 @@ class MatchMakingHandler(MatchmakerServicer):
 
     def GetMatch(self, request, context):
         # Unique identity for this connection
-        identity = request.username.encode() + secrets.token_bytes(16)
+        identity = request.username.encode() + secrets.token_bytes(8)
 
         # Prepare ZeroMQ connection to get added to the queue
         zmq_context = zmq.Context()
-        socket: zmq.Socket = zmq_context.socket(zmq.REQ)
-        socket.connect("ipc://matchmaker_requests.ipc")
+        with zmq_context.socket(zmq.REQ) as socket:
+            socket.connect("ipc://matchmaker_requests.ipc")
 
-        # Wait until we are added to the queue
-        socket.send_multipart((identity, request.SerializeToString()))
-        status, response = socket.recv_multipart()
-        if status == b"FAIL":
-            return QuickMatchReply.FromString(response)
+            # Wait until we are added to the queue
+            socket.send_multipart((identity, request.SerializeToString()))
+            status, response = socket.recv_multipart()
+            if status == b"FAIL":
+                return QuickMatchReply.FromString(response)
 
-        # Wait until we are assigned a game
-        socket = zmq_context.socket(zmq.DEALER)
-        socket.setsockopt(zmq.IDENTITY, identity)
-        socket.connect("ipc://matchmaker_responses.ipc")
+        # Setup new socket to communicate with matchmaking master
+        with zmq_context.socket(zmq.DEALER) as socket:
+            socket.setsockopt(zmq.IDENTITY, identity)
+            socket.connect("ipc://matchmaker_responses.ipc")
 
-        while True:
-            if socket.poll(timeout=1000) == 0:
-                # check if still connected
-                if not context.is_active():
-                    socket.send(identity)
-                    return None
-            else:
-                break
+            # Wait until a game has been assigned
+            # Check every once in a while to see if the client is still alive
+            while True:
+                if not socket.poll(timeout=500):
+                    if not context.is_active():
+                        socket.send(b"DISCONNECT")
+                        return None
+                else:
+                    break
 
-        response = QuickMatchReply.FromString(socket.recv(flags=zmq.NOBLOCK))
-        return response
+            response = QuickMatchReply.FromString(socket.recv(flags=zmq.NOBLOCK))
+            return response
 
 
 class MatchProcessJanitor(Thread):
@@ -136,6 +137,9 @@ class MatchmakingLoginThread(Thread):
         self.socket = context.socket(zmq.REP)
         self.socket.bind("ipc://matchmaker_requests.ipc")
         print("Matchmaker Connector thread listening...")
+
+    def __del__(self):
+        self.socket.close()
 
     def run(self):
         while True:
@@ -225,7 +229,7 @@ class MatchmakingThread(Thread):
     def select_players(self, requests):
         players = []
         for _ in range(self.players_per_game):
-            identity, (request, auth) = requests.pop(last=False)
+            identity, (request, auth) = requests.popitem(last=False)
             players.append((identity, request, auth))
         return players
 
@@ -248,11 +252,11 @@ class MatchmakingThread(Thread):
             # Check if any clients have disconnected
             while True:
                 try:
-                    quitting_identity = self.socket.recv(flags=zmq.NOBLOCK)
+                    quitting_identity, error_code = self.socket.recv_multipart(flags=zmq.NOBLOCK)
                 except zmq.ZMQError:
                     break
                 else:
-                    logger.debug("Player {} quit the matchmaking queue".format(quitting_identity))
+                    logger.debug("{} has quit the matchmaking queue unexpectedly.".format(quitting_identity))
                     try:
                         del requests[quitting_identity]
                     except KeyError:
