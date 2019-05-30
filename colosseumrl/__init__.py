@@ -1,3 +1,5 @@
+name = "colosseumrl"
+
 from .BaseEnvironment import BaseEnvironment
 from .ClientEnvironment import ClientEnvironment
 from .config import get_environment, available_environments
