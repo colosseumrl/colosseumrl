@@ -116,7 +116,10 @@ class TronGridEnvironment(BaseEnvironment):
         board, heads, directions, deaths = state
 
         # Convert the move strings to move indices for c++
-        moves = np.fromiter((self.STRING_TO_ACTION[a] for a in actions), dtype=np.int64, count=len(actions))
+        moves = np.zeros(self.num_players, dtype=np.int64)
+        for player, action in zip(players, actions):
+            moves[player] = self.STRING_TO_ACTION[action]
+        # moves = np.fromiter((self.STRING_TO_ACTION[a] for a in actions), dtype=np.int64, count=len(actions))
 
         # Make a copy of the state since we operate in-place
         new_board = np.copy(board)

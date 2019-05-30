@@ -28,7 +28,7 @@ cpdef void next_state_inplace(long[:, ::1] board,
         action = actions[i]
 
         # Convert this into cardinal directions
-        direction = (directions[i] + action) % 4
+        direction = (directions[i] + action + 4) % 4
 
         # Compute the new move location for this head
         if direction == 0: # North

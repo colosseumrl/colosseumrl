@@ -6,17 +6,18 @@ from rlcompetition.envs.tron import TronGridEnvironment
 from rlcompetition.rl_logging import init_logging
 
 from random import choice, randint
-from matplotlib import pyplot as plt
+import cv2
 import argparse
 from time import time
 from threading import Thread, Lock
-from time import sleep
-
+from time import sleep, time
+import numpy as np
 from pynput.keyboard import Key, Listener
 
 
 logger = init_logging()
 
+FRAME_MILLISECONDS = 200
 
 class Action:
     def __init__(self):
@@ -69,18 +70,23 @@ def tron_client(env: TronGridClientEnvironment, username: str):
     control_thread = ControlThread(current_action)
     control_thread.start()
 
-    plt.figure(figsize=(8, 8))
-    plt.ion()
-
+    frame_start_time = time()
     while True:
-        sleep(0.1)
-        plt.imshow(env.board())
-        plt.draw()
-        plt.pause(0.01)
-        sleep(0.4)
+
+        board = env.board()
+        im = cv2.applyColorMap(np.uint8(board * 255//np.max(board)), cv2.COLORMAP_JET)
+        im = cv2.resize(im, (420,420), interpolation=cv2.INTER_NEAREST)
+
+        cv2.imshow("Tron", im)
+        cv2.waitKey(1)
+        frame_delta = time() - frame_start_time
+        sleep((FRAME_MILLISECONDS / 1000) - frame_delta)
 
         new_obs, reward, terminal, winners = env.step(current_action())
+        frame_start_time = time()
+
         current_action.reset()
+
 
         logger.debug("Got: {}".format((new_obs, reward, terminal, winners)))
         if terminal:

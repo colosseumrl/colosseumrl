@@ -169,6 +169,7 @@ def server_app(dataframe: Dataframe,
     terminal = False
     winners = None
     dataframe.commit()
+    logger.debug(state[0])
 
     fr.start_timeout(timeout.move)
     while not terminal:
@@ -197,10 +198,18 @@ def server_app(dataframe: Dataframe,
                             .format(player.number, player.name, player.action))
                 current_actions.append('')
 
+        logger.debug("current actions: {}".format(current_actions))
+        logger.debug("player turns: {}".format(player_turns))
+
+
         # Execute the current move
         state, player_turns, rewards, terminal, winners = (
             env.next_state(state=state, players=player_turns, actions=current_actions)
         )
+
+        for s in state:
+            logger.debug(s)
+
 
         # Update true state if enabled
         if not args["observations_only"] and env.serializable():
@@ -221,6 +230,7 @@ def server_app(dataframe: Dataframe,
         if terminal:
             server_state.terminal = True
             server_state.winners = dill.dumps(winners)
+
             for player_number in winners:
                 players_by_number[player_number].winner = True
             logger.info("Player: {} won the game.".format(winners))
@@ -248,10 +258,11 @@ def server_app(dataframe: Dataframe,
         while not player.acknowledges_game_over and not fr.tick():
             dataframe.checkout()
 
-    logger.info("Game has ended. Player {} is the winner.".format(dataframe.read_one(ServerState, server_state.oid)))
-
     rankings = env.compute_ranking(state, list(range(len(players))), winners)
-    return {players_by_number[number].name: ranking for number, ranking in rankings.items()}
+    ranking_dict = {players_by_number[number].name: ranking for number, ranking in rankings.items()}
+
+    logger.info("Game has ended. Player {} is the winner.".format([key for key, value in ranking_dict.items() if value == 0]))
+    return ranking_dict
 
 
 if __name__ == '__main__':
