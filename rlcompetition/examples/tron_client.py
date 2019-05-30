@@ -33,6 +33,8 @@ def tron_client(env: TronGridClientEnvironment, username: str):
         if terminal:
             logger.info("Game is over. Players {} won".format(winners))
             logger.info("Final observation: {}".format(new_obs))
+            cv2.destroyAllWindows()
+
             break
 
 
