@@ -73,7 +73,7 @@ class MatchMakingHandler(MatchmakerServicer):
             while True:
                 if not socket.poll(timeout=500):
                     if not context.is_active():
-                        socket.send(b"DISCONNECT")
+                        socket.send(request.username.encode())
                         return None
                 else:
                     break
@@ -252,15 +252,13 @@ class MatchmakingThread(Thread):
             # Check if any clients have disconnected
             while True:
                 try:
-                    quitting_identity, error_code = self.socket.recv_multipart(flags=zmq.NOBLOCK)
+                    quitting_identity, quitting_username = self.socket.recv_multipart(flags=zmq.NOBLOCK)
                 except zmq.ZMQError:
                     break
                 else:
                     logger.debug("{} has quit the matchmaking queue unexpectedly.".format(quitting_identity))
-                    try:
-                        del requests[quitting_identity]
-                    except KeyError:
-                        pass
+                    self.database.logoff(quitting_username.decode())
+                    requests.pop(quitting_identity, 0)
 
             # Once we have enough players for a game, start a game server and send the coordinates
             if len(requests) >= self.players_per_game:

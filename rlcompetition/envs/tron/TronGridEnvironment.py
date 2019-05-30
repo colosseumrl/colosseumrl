@@ -1,6 +1,7 @@
 import numpy as np
 from typing import Dict, Tuple, List, Union
 from dill import dumps, loads
+from time import time
 
 from rlcompetition.BaseEnvironment import BaseEnvironment
 from .CyTronGrid import next_state_inplace, relative_player_inplace
@@ -21,7 +22,14 @@ def ParseTronGridConfig(config: str):
         except ValueError:
             return inp.lower() == "true"
 
-    return tuple(map(parse, config.split(";")))
+    options = list(map(parse, config.split(";")))
+    if len(options) == 1:
+        options.append(4)
+    if len(options) == 2:
+        options.append(-1)
+    if len(options) == 3:
+        options.append(False)
+    return options
 
 
 class TronGridEnvironment(BaseEnvironment):
@@ -93,6 +101,7 @@ class TronGridEnvironment(BaseEnvironment):
 
         # Generate the Starting configuration
         # TODO Make the starting points fair and spread out
+        np.random.seed(int(time()))
         board = np.zeros((self.N, self.N), dtype=np.int64)
         heads = np.random.choice(self.N * self.N, size=self.num_players, replace=False)
         directions = np.random.randint(0, 4, size=num_players, dtype=np.int64)
