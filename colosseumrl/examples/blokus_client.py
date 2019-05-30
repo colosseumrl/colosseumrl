@@ -1,7 +1,7 @@
 from ..envs.blokus.BlokusEnvironment import BlokusEnvironment
 from ..envs.blokus.BlokusClientEnvironment import BlokusClientEnvironment
-from rlcompetition.rl_logging import init_logging
-from rlcompetition.RLApp import RLApp
+from colosseumrl.rl_logging import init_logging
+from colosseumrl.RLApp import RLApp
 import numpy as np
 from random import choice
 

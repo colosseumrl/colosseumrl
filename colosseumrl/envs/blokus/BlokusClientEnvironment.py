@@ -3,7 +3,7 @@ from typing import Tuple, List, Dict
 from .ai import AI
 from .BlokusEnvironment import start_gui, terminate_gui, display_board
 from .board import Board
-from rlcompetition.ClientEnvironment import ClientEnvironment
+from colosseumrl.ClientEnvironment import ClientEnvironment
 
 
 class BlokusClientEnvironment(ClientEnvironment):

@@ -1,4 +1,4 @@
-from rlcompetition.ClientEnvironment import ClientEnvironment
+from colosseumrl.ClientEnvironment import ClientEnvironment
 
 from .TronGridEnvironment import ParseTronGridConfig, TronGridEnvironment
 

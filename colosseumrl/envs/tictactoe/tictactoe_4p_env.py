@@ -4,27 +4,50 @@ import dill
 import numpy as np
 import scipy.signal
 
-from rlcompetition.BaseEnvironment import BaseEnvironment
+from colosseumrl.BaseEnvironment import BaseEnvironment
+
 
 State = object
 
+
+def _diagonal3d():
+    x = np.zeros((3, 3, 3))
+    x[np.diag_indices(3, ndim=3)] = 1
+    return x
+
 # Match these patterns to win
 WINNING_SHAPES = [
-    np.full((3, 1), 1, np.int8),
-    np.full((1, 3), 1, np.int8),
-    np.identity(3, np.int8),
-    np.rot90(np.identity(3, np.int8), 1)
+    np.full((3, 1, 1), 1, np.int8),
+    np.full((1, 3, 1), 1, np.int8),
+    np.full((1, 1, 3), 1, np.int8),
+
+    np.expand_dims(np.identity(3, np.int8), axis=-1),
+    np.expand_dims(np.rot90(np.identity(3, np.int8), 1), axis=-1),
+
+    np.expand_dims(np.identity(3, np.int8), axis=0),
+    np.expand_dims(np.rot90(np.identity(3, np.int8), 1), axis=0),
+
+    np.expand_dims(np.identity(3, np.int8), axis=1),
+    np.expand_dims(np.rot90(np.identity(3, np.int8), 1), axis=1),
+
+    _diagonal3d(),
+    np.rot90(_diagonal3d(), k=1, axes=(0, 1)),
+    np.rot90(_diagonal3d(), k=1, axes=(1, 2)),
+    np.rot90(np.rot90(_diagonal3d(), k=1, axes=(0, 1)), k=1, axes=(1, 2))
+
 ]
 
 PLAYER_NUM_TO_STRING = {
-    -1: " ",
+    -1: ".",
     0: "X",
     1: "O",
+    2: "Y",
+    3: "Z"
 }
 
 
 def _relative_player_id(current_player: int, absolute_player_num: np.ndarray) -> np.ndarray:
-    return np.where(absolute_player_num < 0, absolute_player_num, (absolute_player_num - current_player) % 2)
+    return np.where(absolute_player_num < 0, absolute_player_num, (absolute_player_num - current_player) % 3)
 
 
 def action_to_string(index: Tuple[int, int]) -> str:
@@ -76,54 +99,61 @@ def print_board(state: object):
     -----
     X marks player 0.
     O marks player 1.
+    Y marks player 2.
+    Z marks player 3.
     """
 
     board, winner = state
+    # board = state
+    # winner = None
 
-    board = board.tolist()
+    board = board.swapaxes(1,2).tolist()
 
     if winner is not None:
-        print("\nWinner: {}".format(winner))
+        print("\nWinner: {} (marked by {})".format(winner, PLAYER_NUM_TO_STRING[winner]))
     else:
         print("")
 
     for i, row in enumerate(board):
-        for j, player_num in enumerate(row):
-            print(' {} '.format(PLAYER_NUM_TO_STRING[player_num]), end='')
-            if j+1 < len(row):
-                print('|', end='')
-        print('')
+        for j, z_level in enumerate(row):
+            for k, player_num in enumerate(z_level):
+                space = ['   ', '   ', '   ']
+                space[j] = ' {} '.format(PLAYER_NUM_TO_STRING[player_num])
+                print("".join(space), end='')
+                if k+1 < len(z_level):
+                    print('|', end='')
+            print('')
         if i+1 < len(board):
-            print('-' * (3*3 + 2))
+            print('-' * (len(row)*10 - 1))
     print("")
 
 
-class TicTacToe2PlayerEnv(BaseEnvironment):
+class TicTacToe4PlayerEnv(BaseEnvironment):
     r"""
-    Full TicTacToe 2Player environment class with access to the actual game state.
+    Full TicTacToe 4Player environment class with access to the actual game state.
     """
 
     @property
     def min_players(self) -> int:
         r""" Property holding the number of players present required to play the game.
 
-        (Always 2)
+        (Always 4)
         """
-        return 2
+        return 4
 
     @property
     def max_players(self) -> int:
         r""" Property holding the max number of players present for a game.
 
-        (Always 2)
+        (Always 4)
         """
-        return 2
+        return 4
 
     @property
     def observation_shape(self) -> Dict[str, Tuple[int, ...]]:
         """ Property holding the numpy array shapes for each value in an observation dictionary."""
 
-        return {"board": (3, 3)}
+        return {"board": (3, 3, 3)}
 
     @staticmethod
     def observation_names():
@@ -136,8 +166,9 @@ class TicTacToe2PlayerEnv(BaseEnvironment):
 
         return ["board"]
 
-    def new_state(self, num_players: int = 2) -> Tuple[State, List[int]]:
-        r"""Create a fresh TicTacToe 2Player board state for a new game.
+    def new_state(self, num_players: int = 4) -> Tuple[State, List[int]]:
+        r"""new_state(self) -> object
+        Create a fresh TicTacToe 3Player board state for a new game.
 
         Returns
         -------
@@ -158,11 +189,11 @@ class TicTacToe2PlayerEnv(BaseEnvironment):
 
         """
         if num_players is None:
-            num_players = 2
+            num_players = 4
 
-        assert num_players == 2
+        assert num_players == 4
 
-        board = np.full((3, 3), -1, np.int8)
+        board = np.full((3, 3, 3), -1, np.int8)
 
         winner = None
 
@@ -295,7 +326,7 @@ class TicTacToe2PlayerEnv(BaseEnvironment):
             new_board[index] = player_num
             player_mask = (new_board == player_num)
             for pattern in WINNING_SHAPES:
-                if 3 in scipy.signal.correlate2d(player_mask, pattern, 'valid'):
+                if 3 in scipy.signal.correlate(player_mask, pattern, 'valid'):
                     winner = player_num
                     break
 
@@ -310,7 +341,7 @@ class TicTacToe2PlayerEnv(BaseEnvironment):
         if self.valid_actions(state=(new_board, winner), player=player_num) == ['']:
                 terminal = True
 
-        new_player_num = (player_num + 1) % 2
+        new_player_num = (player_num + 1) % 4
 
         return (new_board, winner), [new_player_num], [reward], terminal, winners
 

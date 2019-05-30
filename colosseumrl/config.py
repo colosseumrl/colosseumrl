@@ -2,30 +2,30 @@
 
 
 def blokus():
-    from rlcompetition.envs.blokus import BlokusEnvironment
+    from colosseumrl.envs.blokus import BlokusEnvironment
     return BlokusEnvironment
 
 
 def tron():
-    from rlcompetition.envs.tron.TronGridEnvironment import TronGridEnvironment
+    from colosseumrl.envs.tron.TronGridEnvironment import TronGridEnvironment
     return TronGridEnvironment
 
 
 def test_game():
-    from rlcompetition.envs.testgame.TestGame import TestGame
+    from colosseumrl.envs.testgame.TestGame import TestGame
     return TestGame
 
 
 def tic_tac_toe(n):
     def ttt():
         if n == 2:
-            from rlcompetition.envs.tictactoe.tictactoe_2p_env import TicTacToe2PlayerEnv
+            from colosseumrl.envs.tictactoe.tictactoe_2p_env import TicTacToe2PlayerEnv
             return TicTacToe2PlayerEnv
         if n == 3:
-            from rlcompetition.envs.tictactoe.tictactoe_3p_env import TicTacToe3PlayerEnv
+            from colosseumrl.envs.tictactoe.tictactoe_3p_env import TicTacToe3PlayerEnv
             return TicTacToe3PlayerEnv
         if n == 4:
-            from rlcompetition.envs.tictactoe.tictactoe_4p_env import TicTacToe4PlayerEnv
+            from colosseumrl.envs.tictactoe.tictactoe_4p_env import TicTacToe4PlayerEnv
             return TicTacToe4PlayerEnv
         else:
             raise ValueError("No Tic Tac Toe with {} players".format(n))

@@ -2,7 +2,7 @@
 
 from typing import Tuple, List, Union, Dict
 import numpy as np
-from rlcompetition.BaseEnvironment import BaseEnvironment
+from colosseumrl.BaseEnvironment import BaseEnvironment
 
 
 class TestGame(BaseEnvironment):

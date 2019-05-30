@@ -1,9 +1,9 @@
-from rlcompetition.matchmaking import request_game, GameResponse
-from rlcompetition.RLApp import create_rl_agent
-from rlcompetition.envs.tron import TronGridClientEnvironment
-from rlcompetition.envs.tron import TronGridEnvironment
+from colosseumrl.matchmaking import request_game, GameResponse
+from colosseumrl.RLApp import create_rl_agent
+from colosseumrl.envs.tron import TronGridClientEnvironment
+from colosseumrl.envs.tron import TronGridEnvironment
 
-from rlcompetition.rl_logging import init_logging
+from colosseumrl.rl_logging import init_logging
 
 from random import choice, randint
 import argparse

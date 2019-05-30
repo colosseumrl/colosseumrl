@@ -3,7 +3,7 @@ from typing import Dict, Tuple, List, Union
 from dill import dumps, loads
 from time import time
 
-from rlcompetition.BaseEnvironment import BaseEnvironment
+from colosseumrl.BaseEnvironment import BaseEnvironment
 from .CyTronGrid import next_state_inplace, relative_player_inplace
 
 
