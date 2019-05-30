@@ -198,18 +198,10 @@ def server_app(dataframe: Dataframe,
                             .format(player.number, player.name, player.action))
                 current_actions.append('')
 
-        logger.debug("current actions: {}".format(current_actions))
-        logger.debug("player turns: {}".format(player_turns))
-
-
         # Execute the current move
         state, player_turns, rewards, terminal, winners = (
             env.next_state(state=state, players=player_turns, actions=current_actions)
         )
-
-        for s in state:
-            logger.debug(s)
-
 
         # Update true state if enabled
         if not args["observations_only"] and env.serializable():
