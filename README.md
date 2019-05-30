@@ -14,9 +14,6 @@ This library requires at least Python 3.6 in order to run correctly.
 Basic requirements are listed in the `requirements.txt` and can be installed from PyPi with
 `pip install -r requirements.txt`.
 
-This project also requires the [Spacetime framework](https://github.com/Mondego/spacetime), 
-which current doesnt have a PyPi entry.
-
 ## Install
 Simply clone the repo and run `pip install -e .` in the root directory
 to install a development copy of the library. Full pip install is 
