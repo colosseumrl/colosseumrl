@@ -169,7 +169,6 @@ def server_app(dataframe: Dataframe,
     terminal = False
     winners = None
     dataframe.commit()
-    logger.debug(state[0])
 
     fr.start_timeout(timeout.move)
     while not terminal:
