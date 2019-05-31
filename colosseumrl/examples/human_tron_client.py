@@ -1,3 +1,13 @@
+""" This script defines an example human operated tron client.
+
+This is meant to be a fun example and a test of the networking and matchmaking system.
+
+NOTE
+----------------------------------------------------------------------------------------------------------
+This script has EXTRA DEPENDENCIES. In order to run this script you need to install opencv and pynput.
+These are left out of the global dependency list in order to simplify installation.
+"""
+
 from colosseumrl.matchmaking import request_game, GameResponse
 from colosseumrl.RLApp import create_rl_agent
 from colosseumrl.envs.tron import TronGridClientEnvironment
@@ -5,11 +15,10 @@ from colosseumrl.envs.tron import TronGridEnvironment
 
 from colosseumrl.rl_logging import init_logging
 
-from random import choice, randint
+from random import randint
 import cv2
 import argparse
-from time import time
-from threading import Thread, Lock
+from threading import Thread
 from time import sleep, time
 import numpy as np
 from pynput.keyboard import Key, Listener
@@ -18,6 +27,7 @@ from pynput.keyboard import Key, Listener
 logger = init_logging()
 
 FRAME_MILLISECONDS = 200
+
 
 class Action:
     def __init__(self):
@@ -74,8 +84,8 @@ def tron_client(env: TronGridClientEnvironment, username: str):
     while True:
 
         board = env.board()
-        im = cv2.applyColorMap(np.uint8(board * 255//np.max(board)), cv2.COLORMAP_JET)
-        im = cv2.resize(im, (420,420), interpolation=cv2.INTER_NEAREST)
+        im = cv2.applyColorMap(np.uint8(board * 255 // np.max(board)), cv2.COLORMAP_JET)
+        im = cv2.resize(im, (420, 420), interpolation=cv2.INTER_NEAREST)
 
         cv2.imshow("Tron", im)
         cv2.waitKey(1)
