@@ -22,6 +22,23 @@ class ClientEnvironment:
                  host: str,
                  server_environment: Optional[Type[BaseEnvironment]] = None,
                  auth_key: str = ''):
+        """ The primary class for interacting with the environment as a remote client.
+
+        Parameters
+        ----------
+        dataframe : Dataframe
+            The spacetime dataframe connected to the game server.
+        dimensions : List[str]
+            The names of the observation dimensions
+        observation_class : Type[Observation]
+            The base class of observations in the dataframe.
+        host : str
+            The hostname of the game server
+        server_environment : Optional[Type[BaseEnvironment]]
+            The full server environment if we have access to it.
+        auth_key : str
+            Your authorization key for entering the game if the server has a whitelist.
+        """
 
         self.player_df: Dataframe = dataframe
         self.observation_df: Optional[Dataframe] = None
@@ -46,7 +63,8 @@ class ClientEnvironment:
         self.fr: FrameRateKeeper = FrameRateKeeper(self._TickRate)
         self.connected: bool = False
 
-    def pull_dataframe(self):
+    def pull_dataframe(self) -> None:
+        """ Helper function to update all dataframes for this environment. """
         self.player_df.pull()
         self.player_df.checkout()
 
@@ -54,43 +72,126 @@ class ClientEnvironment:
             self.observation_df.pull()
             self.observation_df.checkout()
 
-    def push_dataframe(self):
+    def push_dataframe(self) -> None:
+        """ Helper function to push all dataframes for this environment. """
         self.player_df.commit()
         self.player_df.push()
 
-    def tick(self):
+    def check_connection(self) -> None:
+        """ Helper function to error out if we are not yet connected to a game server.
+
+        Raises
+        ------
+        ConnectionError
+            If connect() has not been called yet.
+        """
+        if not self.connected:
+            raise ConnectionError("Not connected to game server.")
+
+    def tick(self) -> bool:
+        """ Helper function to wait for a tick of the framerate.
+
+        Returns
+        -------
+        bool
+            Whether or not the framerate keeper has raised a timeout.
+        """
         return self.fr.tick()
 
     @property
     def observation(self) -> Dict[str, np.ndarray]:
-        if self._observation is None:
-            raise ConnectionError("Not connected to game server.")
+        """ Get the current observation present for this agent.
 
+        Returns
+        -------
+        Dict[str, np.ndarray]
+            The observation dictionary for this environment.
+        """
+        self.check_connection()
         return {dimension: getattr(self._observation, dimension) for dimension in self.dimensions}
 
     @property
     def terminal(self) -> bool:
-        assert self.connected, "Not connected to game server."
+        """ Check if the game has ended for us or not.
+
+        Returns
+        -------
+        bool
+            Whether or not the game has reached a terminal state.
+
+        Raises
+        ------
+        ConnectionError
+            If connect() has not been called yet.
+        """
+        self.check_connection()
         return self._server_state.terminal
 
     @property
     def winners(self) -> Optional[List[int]]:
-        assert self.connected, "Not connected to game server."
+        """ Get the current list of winners for the game.
+
+        Returns
+        -------
+        List[int]
+            The list of player numbers of the winners.
+
+        Raises
+        ------
+        ConnectionError
+            If connect() has not been called yet.
+        ValueError
+            If the game is not over yet.
+        """
+        if not self.terminal:
+            raise ValueError("Game has not ended yet.")
+
         return dill.loads(self._server_state.winners)
 
     @property
     def server_environment(self) -> Optional[BaseEnvironment]:
+        """ Get the full server environment object if we have it available.
+
+        Returns
+        -------
+        BaseEnvironment
+            Server environment or None is not available.
+        """
         return self._server_environment
 
     @property
     def dimensions(self) -> List[str]:
+        """ Get all of the observations that we recieve from the server.
+
+        Returns
+        -------
+        List[str]
+            The keys in the observation dictionary.
+        """
         return self._dimensions
 
     @property
     def full_state(self):
-        """ Full server state for the game if the environment and the server support it. """
+        """ Full server state for the game if the environment and the server support it.
+
+        Returns
+        -------
+        object
+            Current server state
+
+        Raises
+        ------
+        ConnectionError
+            If connect() has not been called yet.
+        ValueError
+            If we do not have access to the full state.
+        """
+
+        self.check_connection()
+
         if not self.server_environment.serializable():
             raise ValueError("Current Environment does not support full state for clients.")
+
         return self.server_environment.deserialize_state(self._server_state.serialized_state)
 
     def connect(self, username: str, timeout: Optional[float] = None) -> int:
@@ -106,6 +207,17 @@ class ClientEnvironment:
         Returns
         -------
         player_number: int
+            The assigned player number in the global game.
+
+        Raises
+        ------
+        ConnectionError
+            If we could not connect to the game server successfully.
+
+        Notes
+        -----
+        This is your absolute player number that will be used for interpreting the full server state
+        and the winners after the end of the game.
         """
 
         # Add this player to the game.
@@ -160,10 +272,6 @@ class ClientEnvironment:
         self.connected = True
         return self._player.number
 
-    def wait_for_start(self, timeout: Optional[float] = None):
-        """ Secondary name for to be clearer when starting game. """
-        self.wait_for_turn(timeout)
-
     def wait_for_turn(self, timeout: Optional[float] = None):
         """ Block until it is your turn. This is usually only used in the beginning of the game.
 
@@ -193,8 +301,17 @@ class ClientEnvironment:
 
         return self.observation
 
+    def wait_for_start(self, timeout: Optional[float] = None):
+        """ Secondary name for to be clearer when starting game. """
+        self.wait_for_turn(timeout)
+
     def valid_actions(self):
         """ Get a list of all valid moves for the current state.
+
+        Raises
+        ------
+        NotImplementedError
+            If the client environment does not have access to all of your available moves.
 
         Returns
         -------
@@ -216,10 +333,15 @@ class ClientEnvironment:
 
         Returns
         -------
-        observation
-        reward
-        terminal
-        winners
+        observation : Dict[str, np.ndarray]
+            The new observation dictionary for the new state.
+        reward : float
+            The reward for the previous action.
+        terminal : bool
+            Whether or not the game has ended.
+        winners : Optional[List[int]]
+            If terminal is true, this will be a list of the player numbers that have won
+            If terminal is false, this will be None
         """
         if not self.terminal:
             self._player.action = action

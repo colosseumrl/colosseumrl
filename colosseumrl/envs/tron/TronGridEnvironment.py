@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Dict, Tuple, List, Union
+from typing import Dict, Tuple, List
 from dill import dumps, loads
 from time import time
 
@@ -7,12 +7,36 @@ from colosseumrl.BaseEnvironment import BaseEnvironment
 from .CyTronGrid import next_state_inplace, relative_player_inplace
 
 
-def CreateTronGridConfig(*args) -> str:
+def create_tron_config(*args) -> str:
+    """ Convert a list of parameters into a serialized tron grid string.
+    Parameters
+    ----------
+    args
+        All of the arguments into tron grid as star args.
+
+    Returns
+    -------
+    str
+        Serialized string
+    """
     raw_string = "{};" * len(args)
     return raw_string[:-1].format(*args)
 
 
-def ParseTronGridConfig(config: str):
+def parse_tron_config(config: str) -> Tuple:
+    """ Convert a serialized configuration string into the list of options to tron grid.
+
+    Parameters
+    ----------
+    config : str
+        Config string in the form "{};{};...;{}"
+
+    Returns
+    -------
+    List
+        A list of options into tron grid environment.
+
+    """
     if len(config) == 0:
         return 20, 4, -1, False
 
@@ -47,14 +71,28 @@ class TronGridEnvironment(BaseEnvironment):
                remove_on_death: bool = False) -> "TronGridEnvironment":
         """ Secondary constructor with explicit options for creating the environment
         """
-        return TronGridEnvironment(CreateTronGridConfig(board_size,
-                                                        num_players,
-                                                        observation_window,
-                                                        remove_on_death))
+        return TronGridEnvironment(create_tron_config(board_size,
+                                                      num_players,
+                                                      observation_window,
+                                                      remove_on_death))
 
     def __init__(self, config: str = ""):
+        """ Create the discrete tron environment.
+
+        Parameters
+        ----------
+        config : str
+            Serialized config string for specifying options for the environment.
+            Use TronGridEnvironment.create for a more programming friendly way of initializing
+            the environment.
+
+        See Also
+        --------
+        colosseumrl.envs.tron.TronGridEnvironment.create
+            A better constructor for the tron environment.
+        """
         super().__init__(config)
-        board_size, num_players, observation_window, remove_on_death = ParseTronGridConfig(config)
+        board_size, num_players, observation_window, remove_on_death = parse_tron_config(config)
 
         self.N = board_size
         self.num_players = num_players
@@ -66,28 +104,61 @@ class TronGridEnvironment(BaseEnvironment):
         self.move_array = ['forward', 'right', 'left']
 
     def __repr__(self):
-        print("Tron Finite Grid Environment")
-        print("="*50)
-        print("\tSize: {}x{}".format(self.N, self.N))
-        print("\tNumber of players: {}".format(self.num_players))
-        print("\tFully Observable: {}".format("Yes" if self.fully_observable else "No"))
-        print("\tRemove old players: {}".format("Yes" if self.remove_on_death else "No"))
-        print("-"*50)
+        output = ""
+        output += "Tron Finite Grid Environment"
+        output += "="*50
+        output += "\tSize: {}x{}".format(self.N, self.N)
+        output += "\tNumber of players: {}".format(self.num_players)
+        output += "\tFully Observable: {}".format("Yes" if self.fully_observable else "No")
+        output += "\tRemove old players: {}".format("Yes" if self.remove_on_death else "No")
+        output += "-"*50
+        return output
+
+    def __str__(self):
+        return self.__repr__()
 
     @property
     def min_players(self) -> int:
+        """ Property holding the number of players present required to play game.
+
+        Returns
+        -------
+        int
+            The specified number of players in this game.
+        """
         return self.num_players
 
     @property
     def max_players(self) -> int:
+        """ Property holding the number of players present required to play game.
+
+        Returns
+        -------
+        int
+            The specified number of players in this game.
+        """
         return self.num_players
 
     @staticmethod
     def observation_names() -> List[str]:
+        """ Static method for returning the names of the observation objects.
+
+        Returns
+        -------
+        List[str]
+            The keys of the observation dictionary.
+        """
         return ["board", "heads", "directions", "deaths"]
 
     @property
     def observation_shape(self) -> Dict[str, tuple]:
+        """ Describe the fixed numpy shapes of each observation.
+
+        Returns
+        -------
+        Dict[str, Tuple[int]]
+            The shape, as a tuple, of each numpy array by their name.
+        """
         return {
             "board": (self.N, self.N),
             "heads": (self.num_players, ),
@@ -96,6 +167,22 @@ class TronGridEnvironment(BaseEnvironment):
         }
 
     def new_state(self, num_players: int = None) -> Tuple[object, List[int]]:
+        """ Create an initial tron state.
+
+        Parameters
+        ----------
+        num_players : int, optional.
+            The number of players for the game.
+            Note, this option gets ignored here in favor of the global player configuration when creating
+            the environment.
+
+        Returns
+        -------
+        State : Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+            The full state of the new tron environment.
+        player_list : List[int]
+            Which players are currently acting.
+        """
         num_players = self.num_players if num_players is None else num_players
         assert num_players == self.num_players, "Do not change the number of players from the game configuration."
 
@@ -113,13 +200,40 @@ class TronGridEnvironment(BaseEnvironment):
         return (board, heads, directions, deaths), self.player_array
 
     def next_state(self, state: object, players: [int], actions: [str]):
+        """ Compute a single step in the game.
+
+        Notes
+        -----
+        Player numbers must be numbers in the set {0, 1, ..., n-1} for an n player game.
+
+        Parameters
+        ----------
+        state : Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
+            The current state of the game.
+        players: [int]
+            The players which are taking the given actions.
+        actions : [str]
+            The actions of each player.
+
+        Returns
+        -------
+        new_state : object
+            The new state of the game.
+        new_players: List[int]
+            List of players who's turn it is in the new state now.
+        rewards : List[float]
+            The reward for each player that acted.
+        terminal : bool
+            Whether or not the game has ended.
+        winners: List[int]
+            If the game has ended, who are the winners.
+        """
         board, heads, directions, deaths = state
 
         # Convert the move strings to move indices for c++
         moves = np.zeros(self.num_players, dtype=np.int64)
         for player, action in zip(players, actions):
             moves[player] = self.STRING_TO_ACTION[action]
-        # moves = np.fromiter((self.STRING_TO_ACTION[a] for a in actions), dtype=np.int64, count=len(actions))
 
         # Make a copy of the state since we operate in-place
         new_board = np.copy(board)
@@ -137,7 +251,7 @@ class TronGridEnvironment(BaseEnvironment):
         rewards = -2 * (new_deaths > 0) + 1
 
         # Terminal is if everyone or everyone except one has died
-        terminal = (new_deaths > 0).sum() >= self.num_players - 1
+        terminal = new_players.size <= 1
 
         # Winner is the final player or nobody if tie
         winners = new_players if terminal else None
@@ -145,12 +259,65 @@ class TronGridEnvironment(BaseEnvironment):
         return (new_board, new_heads, new_directions, new_deaths), new_players, rewards, terminal, winners
 
     def valid_actions(self, state: object, player: int) -> [str]:
+        """ Valid actions for a specific state.
+
+        Parameters
+        ----------
+        state : object
+            The current state of the game.
+        player : int
+            The player who is executing this action.
+
+        Returns
+        -------
+        List[str]
+            All possible actions for the game.
+            For tron, this will always be ['forward', 'left', 'right']
+        """
         return self.move_array
 
     def is_valid_action(self, state: object, player: int, action: str) -> bool:
+        """ Whether or not an action is valid for a specific state.
+
+        Parameters
+        ----------
+        state : object
+            The current state of the game.
+        player : int
+            The player who is executing this action.
+        action : str
+            The action the player is executing.
+
+        Returns
+        -------
+        bool
+            Whether or not this is a valid action in the current state.
+            This is always true for tron as every action is valid.
+        """
         return True
 
     def state_to_observation(self, state: object, player: int) -> Dict[str, np.ndarray]:
+        """ Convert the raw game state to the observation for the agent. Maps each observation name into an observation.
+
+        Parameters
+        ----------
+        state : object
+            The full server state of the game.
+        player : int
+            Which player is getting the observation.
+
+        Returns
+        -------
+        Dict[str, np.ndarray]
+            The observation dictionary with keys equal to the observation_names above.
+
+        See Also
+        --------
+        colosseumrl.envs.tron.TronGridEnvironment.observation_names
+            The list of observatio keys.
+        colosseumrl.envs.tron.TronGridEnvironment.observation_shapes
+            The sizes of each observation.
+        """
         board, heads, directions, deaths = state
 
         # Adjust board to reflect relative player number
@@ -190,14 +357,44 @@ class TronGridEnvironment(BaseEnvironment):
 
     @staticmethod
     def serializable() -> bool:
-        """ Whether or not this class supports serialization of the state."""
+        """ Whether or not this class supports serialization of the state.
+
+        Returns
+        -------
+        bool
+            False, Tron doesnt need to be serializable as the state is current fully observable.
+        """
         return False
 
     @staticmethod
     def serialize_state(state: object) -> bytearray:
+        """ Serialize a game state and convert it to a bytearray to be saved or sent over a network.
+
+        Parameters
+        ----------
+        state : object
+            The current game state.
+
+        Returns
+        -------
+        bytearray
+            Serialized byte-string for the state.
+        """
         return dumps(state)
 
     @staticmethod
     def deserialize_state(serialized_state: bytearray) -> object:
+        """ Convert a serialized bytearray back into a game state.
+
+        Parameters
+        ----------
+        serialized_state : bytearray
+            Serialized byte-string for the state.
+
+        Returns
+        -------
+        object
+            The current game state.
+        """
         return loads(serialized_state)
 

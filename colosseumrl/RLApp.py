@@ -95,6 +95,31 @@ def create_rl_agent(agent_fn: Callable[[ClientEnvironment], None],
                     client_environment: Type[ClientEnvironment] = ClientEnvironment,
                     server_environment: Optional[Type[BaseEnvironment]] = None,
                     time_out: int = 0):
+    """ Create an online reinforcement learning agent from an agent function.
+
+    Parameters
+    ----------
+    agent_fn :
+        Agent function that has the client environment as the first parameter.
+    host : str
+        Hostname of game server.
+    port : int
+        Port of the game server.
+    auth_key : str
+        Authorization key if the server is whitelisted.
+    client_environment : Type[ClientEnvironment], optional.
+        The client environment to create when connected. By default, this will create a generic client environment.
+    server_environment : Type[BaseEnvironment], optional.
+        The server environment if you know what game and environment the server is running.
+    time_out : int, optional.
+        The timeout for connecting to the server.
+
+    Returns
+    -------
+    RLApp
+        An application ready to run with the agent function.
+
+    """
     return RLApp(host, port, auth_key, client_environment, server_environment, time_out)(agent_fn)
 
 
@@ -106,6 +131,30 @@ def launch_rl_agent(agent_fn: Callable[[ClientEnvironment], None],
                     server_environment: Optional[Type[BaseEnvironment]] = None,
                     time_out: int = 0,
                     **kwargs):
+    """ Create and launch an online reinforcement learning agent from an agent function.
+
+    Parameters
+    ----------
+    agent_fn :
+        Agent function that has the client environment as the first parameter.
+    host : str
+        Hostname of game server.
+    port : int
+        Port of the game server.
+    auth_key : str
+        Authorization key if the server is whitelisted.
+    client_environment : Type[ClientEnvironment], optional.
+        The client environment to create when connected. By default, this will create a generic client environment.
+    server_environment : Type[BaseEnvironment], optional.
+        The server environment if you know what game and environment the server is running.
+    time_out : int, optional.
+        The timeout for connecting to the server.
+
+    Returns
+    -------
+    object
+        The return values of your agent function.
+    """
     return create_rl_agent(agent_fn, host, port, auth_key, client_environment, server_environment, time_out)(**kwargs)
 
 

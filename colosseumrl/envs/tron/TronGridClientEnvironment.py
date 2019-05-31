@@ -1,6 +1,8 @@
 from colosseumrl.ClientEnvironment import ClientEnvironment
 
-from .TronGridEnvironment import ParseTronGridConfig, TronGridEnvironment
+from .TronGridEnvironment import parse_tron_config, TronGridEnvironment
+
+from typing import Tuple
 
 
 # Stub for later
@@ -9,7 +11,7 @@ class TronGridClientEnvironment(ClientEnvironment):
         super().__init__(*args, **kwargs)
 
         # Parse out config for easy access to game parameters
-        config = ParseTronGridConfig(self._server_state.env_config)
+        config = parse_tron_config(self._server_state.env_config)
         self.board_size = config[0]
         self.num_players = config[1]
         self.observation_window = config[2]
@@ -20,8 +22,18 @@ class TronGridClientEnvironment(ClientEnvironment):
             self._server_environment = TronGridEnvironment(config)
 
     @staticmethod
-    def direction_to_delta(direction):
-        """ Convert an integer direction into an x, y delta """
+    def direction_to_delta(direction: int) -> Tuple[int, int]:
+        """ Convert an integer direction into an x, y delta
+
+        Parameters
+        ----------
+        direction : int
+            The base direction provided by the directions dictionary.
+        Returns
+        -------
+        Tuple[int, int]
+            The offset required in the x and y direction.
+        """
         if direction == 0:
             return 0, -1
         elif direction == 1:
