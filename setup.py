@@ -28,7 +28,6 @@ setup(
     url="https://github.com/colosseumrl/Colosseum",
     packages=setuptools.find_packages(),
     ext_modules=cythonize(extensions),
-    cmdclass={'build_ext': build_ext},
     install_requires=requirements,
     classifiers=[
         "Programming Language :: Python :: 3.5",
