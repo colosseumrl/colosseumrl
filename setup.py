@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 extensions = [
-    Extension("CyTronGrid", ["CyTronGrid.pyx"],
+    Extension("CyTronGrid", ["colosseumrl/envs/tron/CyTronGrid.pyx"],
               extra_compile_args=["-O3", "-march=native"])
 ]
 
