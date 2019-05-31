@@ -1,0 +1,3 @@
+from .tictactoe_2p_env import TicTacToe2PlayerEnv
+from .tictactoe_3p_env import TicTacToe3PlayerEnv
+from .tictactoe_4p_env import TicTacToe4PlayerEnv

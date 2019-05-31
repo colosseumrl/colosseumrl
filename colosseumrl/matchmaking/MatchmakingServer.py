@@ -94,6 +94,25 @@ class MatchProcessJanitor(Thread):
                  match_server_args: Dict,
                  player_list: List,
                  whitelist: List = None):
+        """ Create a janitor thread that will start a game and close it once it is finished.
+
+        Parameters
+        ----------
+        match_limit : Semaphore
+            Synchronization semaphore to make sure that we limit the number of simulations matches.
+        ports_to_use_queue : Queue
+            Queue holding available ports for this server.
+        database : RankingDatabase
+            Global database for player ranking.
+        env_class : Type[BaseEnvironment]
+            The game class to launch the server around.
+        match_server_args : Dict
+            Any arguments to pass to the match server as keyword star arguments.
+        player_list : List[str]
+            A list of usernames participating in this game. This will be the whitelist for the server.
+        whitelist : List
+            A list of usernames participating in this game. This will be the whitelist for the server. Again...
+        """
         super().__init__()
         self.match_limit = match_limit
         self.match_server_args = match_server_args
@@ -127,6 +146,18 @@ class MatchProcessJanitor(Thread):
 
 class MatchmakingLoginThread(Thread):
     def __init__(self, connection_queue: Queue, database: RankingDatabase):
+        """ Thread for managing the login system on the matchmaking server.
+
+        This thread will accept login requests from the GRPC function and add them to the queue of players for
+        a new game.
+
+        Parameters
+        ----------
+        connection_queue: Queue
+            The queue to add new players to after they have been successfully logged in.
+        database : RankingDatabase
+            Global database for player ranking and password store.
+        """
         super().__init__()
 
         self.queue: Queue = connection_queue
@@ -172,7 +203,6 @@ class MatchmakingLoginThread(Thread):
 
 
 class MatchmakingThread(Thread):
-
     def __init__(self,
                  starting_port,
                  hostname,
@@ -182,6 +212,28 @@ class MatchmakingThread(Thread):
                  realtime,
                  observations_only,
                  env_config_string):
+        """ Main matchmaking thread that is responsible for choosing players for each match
+        and assigning a game server to them.
+
+        Parameters
+        ----------
+        starting_port : int
+            Port the begin making match server on
+        hostname : str
+            What hostname to start the game servers on.
+        max_simultaneous_games : int
+            Maximum number of game servers that will be running at any given time.
+        env_class : Type[BaseEnvironment]
+            What environment will the server be running.
+        tick_rate : float
+            What frame rate will the servers operate on.
+        realtime : bool
+            Whether or not the games will be realtime or will wait for player actions.
+        observations_only : bool
+            Whether or not we will send out the true server state if supported.
+        env_config_string : str
+            Configuration string to be passed to the server environments.
+        """
         super().__init__()
 
         self.players_per_game = env_class(env_config_string).min_players
@@ -223,10 +275,26 @@ class MatchmakingThread(Thread):
         self.connection_thread = MatchmakingLoginThread(self.connection_queue, self.database)
 
     def start(self) -> None:
+        """ Start this thread along with the related login thread. """
         super().start()
         self.connection_thread.start()
 
     def select_players(self, requests):
+        """ Select which players will be chosen for an upcoming game.
+
+        At some point, this should use trueskill to create matches with roughly fairly matched opponents.
+
+        Parameters
+        ----------
+        requests : OrderedDict
+            All of the players requested with their username as their key and their request and token as the values.
+
+        Returns
+        -------
+        List
+            A list of players that have been chosen with the appropriate data.
+
+        """
         players = []
         for _ in range(self.players_per_game):
             identity, (request, auth) = requests.popitem(last=False)
@@ -298,6 +366,14 @@ class MatchmakingThread(Thread):
 
 
 def serve(args):
+    """ Main function for Matchmaking server
+
+    Parameters
+    ----------
+    args : Dict
+        Command line arguments
+
+    """
     # Start the separate matchmaking thread
     matchmaker_thread = MatchmakingThread(
         hostname=args['hostname'],

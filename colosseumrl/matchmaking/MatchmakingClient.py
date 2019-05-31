@@ -7,6 +7,7 @@ from .grpc_gen.server_pb2_grpc import MatchmakerStub
 
 
 class GameResponse(NamedTuple):
+    """ The container object for the response from the server. """
     host: str
     port: int
     username: str
@@ -39,14 +40,20 @@ def request_game(hostname: str, port: int, username: str, password: str = "") ->
 
     Returns
     -------
-    GameResponse NamedTuple with the following fields
+    GameResponse
         host: str
+            Hostname of the assigned gamer server.
         port: int
-            Hostname and port of the game server that was created for you
+            Port of the game server that was created for you
         username: str
             Your username again to verify.
         token: str
             Authentication string you will need to provide to connect to the match server
+
+    See Also
+    --------
+    colosseumrl.matchmaking.MatchmakingClient.GameResponse
+        The named tuple that will be returned by this function.
     """
     username = username.lower()
 
