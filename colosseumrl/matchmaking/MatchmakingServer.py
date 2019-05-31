@@ -414,7 +414,11 @@ def start_matchmaking_server(environment: str = 'test',
 
 
 def main():
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="""
+    This script launches a matchmaking server for the colosseum framework. The purpose of this system
+    is to allow for an easy way for players to join a match together without needing to coordinate join time, 
+    server information, or limiting players.
+    """)
     parser.add_argument("--environment", "-e", type=str, default="test",
                         help="The name of the environment. Choices are: {}".format(available_environments()))
     parser.add_argument("--hostname", type=str, default='localhost',

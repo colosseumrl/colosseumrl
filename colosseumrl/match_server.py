@@ -14,7 +14,7 @@ from .data_model import ServerState, Player, _Observation, Observation
 from .rl_logging import init_logging, get_logger
 from .FrameRateKeeper import FrameRateKeeper
 from .BaseEnvironment import BaseEnvironment
-from .config import get_environment, ENVIRONMENT_CLASSES
+from .config import get_environment, ENVIRONMENT_CLASSES, available_environments
 from .util import log_params
 
 
@@ -260,30 +260,34 @@ if __name__ == '__main__':
 
     logger = init_logging(logfile=None, redirect_stdout=True, redirect_stderr=True)
 
-    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument("environment", type=str,
-                        help="The name of the environment. Choices are: ['blokus']")
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter, description="""
+    Script for launching match servers manually. This will launch a game server and wait for players to connect.
+    """)
+    parser.add_argument("--environment", '-e', type=str, default='tron',
+                        help="The name of the environment. Choices are: {}".format(available_environments()))
     parser.add_argument("--config", '-c', type=str, default="",
                         help="Config string that will be passed into the environment constructor.")
     parser.add_argument("--port", "-p", type=int, default=7777,
                         help="Server Port.")
     parser.add_argument("--tick-rate", "-t", type=int, default=60,
-                        help="The max tick rate that the server will run on.")
+                        help="The max frame rate that the server will run on.")
     parser.add_argument("--realtime", "-r", action="store_true",
                         help="With this flag on, the server will not wait for all of the clients to respond.")
     parser.add_argument("--observations-only", '-f', action='store_true',
                         help="With this flag on, the server will not push the true state of the game to the clients "
                              "along with observations")
+    parser.add_argument("--loop", '-l', action='store_true',
+                        help="If this flag is set, the script will continually launch game servers. If not, the "
+                             "program will exit after the game has ended.")
 
     args = parser.parse_args()
     log_params(args)
 
-    # env_class: Type[BaseEnvironment] = get_class(args.environment_class)
     try:
-        env_class: Type[BaseEnvironment] = get_environment(args.environment)
+        env_class = get_environment(args.environment)
     except KeyError:
         raise ValueError("The \'environment\' argument must must be chosen from the following list: {}".format(
-            ENVIRONMENT_CLASSES.keys()
+            available_environments()
         ))
 
     observation_type: Type[_Observation] = Observation(env_class.observation_names())
@@ -294,3 +298,6 @@ if __name__ == '__main__':
                    Types=[Player, ServerState])
         app.start(env_class, observation_type, vars(args))
         del app
+
+        if not args.loop:
+            break
