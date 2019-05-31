@@ -1,3 +1,5 @@
+wheel
+setuptools
 scipy
 grpcio
 grpcio-tools
