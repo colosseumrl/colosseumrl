@@ -26,6 +26,9 @@ from .RankingDatabase import RankingDatabase
 
 logger = get_logger()
 
+# Global ZMQ context that will be used for all communication between threads.
+zmq_context = zmq.Context()
+
 
 def match_server_args_factory(tick_rate: int, realtime: bool, observations_only: bool, env_config_string: str):
     """ Helper factory to make a argument dictionary for servers with varying ports """
@@ -53,9 +56,8 @@ class MatchMakingHandler(MatchmakerServicer):
         identity = request.username.encode() + secrets.token_bytes(8)
 
         # Prepare ZeroMQ connection to get added to the queue
-        zmq_context = zmq.Context()
         with zmq_context.socket(zmq.REQ) as socket:
-            socket.connect("ipc://matchmaker_requests.ipc")
+            socket.connect("inproc://matchmaker_requests")
 
             # Wait until we are added to the queue
             socket.send_multipart((identity, request.SerializeToString()))
@@ -66,7 +68,7 @@ class MatchMakingHandler(MatchmakerServicer):
         # Setup new socket to communicate with matchmaking master
         with zmq_context.socket(zmq.DEALER) as socket:
             socket.setsockopt(zmq.IDENTITY, identity)
-            socket.connect("ipc://matchmaker_responses.ipc")
+            socket.connect("inproc://matchmaker_responses")
 
             # Wait until a game has been assigned
             # Check every once in a while to see if the client is still alive
@@ -164,9 +166,8 @@ class MatchmakingLoginThread(Thread):
         self.database: RankingDatabase = database
         self.daemon = True
 
-        context = zmq.Context()
-        self.socket = context.socket(zmq.REP)
-        self.socket.bind("ipc://matchmaker_requests.ipc")
+        self.socket = zmq_context.socket(zmq.REP)
+        self.socket.bind("inproc://matchmaker_requests")
         print("Matchmaker Connector thread listening...")
 
     def __del__(self):
@@ -242,9 +243,8 @@ class MatchmakingThread(Thread):
         self.daemon = True
 
         # Prepare our context and sockets
-        context = zmq.Context()
-        self.socket = context.socket(zmq.ROUTER)
-        self.socket.bind("ipc://matchmaker_responses.ipc")
+        self.socket = zmq_context.socket(zmq.ROUTER)
+        self.socket.bind("inproc://matchmaker_responses")
         logger.info("Matchmaker thread running")
 
         # Semaphore for tracking the total number of games running
