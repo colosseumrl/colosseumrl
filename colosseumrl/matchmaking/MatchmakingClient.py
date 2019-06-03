@@ -57,9 +57,12 @@ def request_game(hostname: str, port: int, username: str, password: str = "") ->
     """
     username = username.lower()
 
-    with grpc.insecure_channel('{}:{}'.format(hostname, port)) as channel:
-        hashed_password = hash_password(username, password)
-        response = MatchmakerStub(channel).GetMatch(QuickMatchRequest(username=username, password=hashed_password))
+    try:
+        with grpc.insecure_channel('{}:{}'.format(hostname, port)) as channel:
+            hashed_password = hash_password(username, password)
+            response = MatchmakerStub(channel).GetMatch(QuickMatchRequest(username=username, password=hashed_password))
+    except grpc.RpcError as e:
+        raise ConnectionError("Failed to connect to specified host. {}:{}".format(e.code(), e.details()))
 
     if response.server == "FAIL":
         raise ConnectionError("Could not connect to matchmaking server. Error message: {}".format(response.response))

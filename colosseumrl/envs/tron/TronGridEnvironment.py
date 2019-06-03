@@ -70,6 +70,17 @@ class TronGridEnvironment(BaseEnvironment):
                observation_window: int = -1,
                remove_on_death: bool = False) -> "TronGridEnvironment":
         """ Secondary constructor with explicit options for creating the environment
+
+        Parameters
+        ----------
+        board_size : int
+            This will specify the square size of the playing grid.
+        num_players : int
+            Number of active players in the game.
+        observation_window : -1
+            Current not used
+        remove_on_death : bool
+            Whether or not to remove the player and their associated walls when they are eliminated.
         """
         return TronGridEnvironment(create_tron_config(board_size,
                                                       num_players,
@@ -102,6 +113,7 @@ class TronGridEnvironment(BaseEnvironment):
 
         self.player_array = np.arange(num_players)
         self.move_array = ['forward', 'right', 'left']
+        self._moves = np.zeros(num_players, dtype=np.int64)
 
     def __repr__(self):
         output = ""
@@ -231,9 +243,8 @@ class TronGridEnvironment(BaseEnvironment):
         board, heads, directions, deaths = state
 
         # Convert the move strings to move indices for c++
-        moves = np.zeros(self.num_players, dtype=np.int64)
         for player, action in zip(players, actions):
-            moves[player] = self.STRING_TO_ACTION[action]
+            self._moves[player] = self.STRING_TO_ACTION[action]
 
         # Make a copy of the state since we operate in-place
         new_board = np.copy(board)
@@ -242,7 +253,7 @@ class TronGridEnvironment(BaseEnvironment):
         new_deaths = np.copy(deaths)
 
         # Execute the move
-        next_state_inplace(new_board, new_heads, new_directions, new_deaths, moves)
+        next_state_inplace(new_board, new_heads, new_directions, new_deaths, self._moves)
 
         # Reduce players to the ones still alive
         new_players = np.where(new_deaths == 0)[0]
