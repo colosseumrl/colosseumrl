@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class ClientEnvironment:
+    """ Basic client environment that will work with any server environment and handles most of the connection
+    and playing capabilities.
+    """
     _TickRate = 60
 
     def __init__(self,

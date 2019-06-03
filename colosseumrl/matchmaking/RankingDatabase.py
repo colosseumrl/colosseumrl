@@ -15,6 +15,9 @@ class LoginResult(Enum):
 
 
 class RankingDatabase:
+    """ Primary class for managing the SQL database storing all of the players
+    usernames, password, and rankings.
+    """
     LoginResult = LoginResult
 
     def __init__(self, database_file: str):

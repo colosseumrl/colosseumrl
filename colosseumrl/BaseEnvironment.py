@@ -8,6 +8,7 @@ from typing import Tuple, List, Union, Dict
 
 
 class BaseEnvironment(ABC):
+    """ Base class for all environments that can be used by colosseum. """
 
     def __init__(self, config: str = ""):
         """ The base server environment that all implementations should follow.

@@ -71,7 +71,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.username == "":
-        username = "SwagMaster_{}".format(randint(0, 1024))
+        username = "Tester_{}".format(randint(0, 1000))
     else:
         username = args.username
 
@@ -81,6 +81,10 @@ if __name__ == '__main__':
     logger.debug("Current Ranking: {}".format(game.ranking))
 
     # Once we have been assigned a game server, we launch an RLApp agent and begin our computation
-    agent = create_rl_agent(tron_client, game.host, game.port, game.token,
-                            TronGridClientEnvironment, TronGridEnvironment)
+    agent = create_rl_agent(agent_fn=tron_client,
+                            host=game.host,
+                            port=game.port,
+                            auth_key=game.token,
+                            client_environment=TronGridClientEnvironment,
+                            server_environment=TronGridEnvironment)
     agent(username)
