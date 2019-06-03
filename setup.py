@@ -39,7 +39,7 @@ else:
 
 setup(
     name="colosseumrl",
-    version="1.0.3",
+    version="1.0.4",
     author="Alexander Shmakov",
     author_email="alexanders101@gmail.com",
     description="UC Irvine multi-agent reinforcement learning framework",
