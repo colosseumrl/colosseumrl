@@ -16,9 +16,7 @@ Basic requirements are listed in the `requirements.txt` and can be installed fro
 `pip install -r requirements.txt`.
 
 ## Install
-Simply clone the repo and run `pip install -e .` in the root directory
-to install a development copy of the library. Full pip install is 
-not supported yet.
+Simply run `pip install colosseumrl` in order to install the latest stable version from Pypi.
 
 ## Important scripts
 `python3 -m colosseumrl.matchmaking.MatchmakingServer` launches the main matchmaking
