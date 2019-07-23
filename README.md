@@ -8,7 +8,7 @@ A framework for developing large multiplayer reinforcement learning agents that 
 
 
 ## Requirements
-This library requires at least Python 3.5 in order to run correctly.
+This library requires at least Python 3.6 in order to run correctly.
 Python 2.7 is not currently supported.
 
 

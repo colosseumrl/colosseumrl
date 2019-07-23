@@ -117,13 +117,13 @@ class TronGridEnvironment(BaseEnvironment):
 
     def __repr__(self):
         output = ""
-        output += "Tron Finite Grid Environment"
-        output += "="*50
-        output += "\tSize: {}x{}".format(self.N, self.N)
-        output += "\tNumber of players: {}".format(self.num_players)
-        output += "\tFully Observable: {}".format("Yes" if self.fully_observable else "No")
-        output += "\tRemove old players: {}".format("Yes" if self.remove_on_death else "No")
-        output += "-"*50
+        output += "Tron Finite Grid Environment\n"
+        output += "="*50 + "\n"
+        output += "\tSize: {}x{}\n".format(self.N, self.N)
+        output += "\tNumber of players: {}\n".format(self.num_players)
+        output += "\tFully Observable: {}\n".format("Yes" if self.fully_observable else "No")
+        output += "\tRemove old players: {}\n".format("Yes" if self.remove_on_death else "No")
+        output += "-"*50 + "\n"
         return output
 
     def __str__(self):
