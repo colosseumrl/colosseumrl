@@ -18,14 +18,18 @@ def test_game() -> Type[BaseEnvironment]:
     return TestGame
 
 
-def tic_tac_toe(n) -> Callable[[], Type[BaseEnvironment]]:
+def tic_tac_toe(n, alternate_mode=None) -> Callable[[], Type[BaseEnvironment]]:
     def ttt() -> Type[BaseEnvironment]:
         if n == 2:
             from colosseumrl.envs.tictactoe.tictactoe_2p_env import TicTacToe2PlayerEnv
             return TicTacToe2PlayerEnv
         if n == 3:
-            from colosseumrl.envs.tictactoe.tictactoe_3p_env import TicTacToe3PlayerEnv
-            return TicTacToe3PlayerEnv
+            if alternate_mode == '3x4':
+                from colosseumrl.envs.tictactoe.tictactoe_3p_3x4_env import TicTacToe3Player3x4Env
+                return TicTacToe3Player3x4Env
+            else:
+                from colosseumrl.envs.tictactoe.tictactoe_3p_env import TicTacToe3PlayerEnv
+                return TicTacToe3PlayerEnv
         if n == 4:
             from colosseumrl.envs.tictactoe.tictactoe_4p_env import TicTacToe4PlayerEnv
             return TicTacToe4PlayerEnv
@@ -40,6 +44,7 @@ ENVIRONMENT_CLASSES: Dict[str, Callable[[], Type[BaseEnvironment]]] = {
     'test': test_game,
     'tictactoe': tic_tac_toe(2),
     'tictactoe_3p': tic_tac_toe(3),
+    'tictactoe_3p_3x4': tic_tac_toe(3, alternate_mode='3x4'),
     'tictactoe_4p': tic_tac_toe(4)
 }
 
