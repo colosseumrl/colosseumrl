@@ -2,6 +2,7 @@ import numpy as np
 from typing import Dict, Tuple, List
 from dill import dumps, loads
 from time import time
+from itertools import starmap
 
 from colosseumrl.BaseEnvironment import BaseEnvironment
 from .CyTronGrid import next_state_inplace, relative_player_inplace
@@ -178,7 +179,52 @@ class TronGridEnvironment(BaseEnvironment):
             "deaths": (self.num_players, )
         }
 
-    def new_state(self, num_players: int = None) -> Tuple[object, List[int]]:
+    def generate_start_positions(self, ring_offset: int = 1, spawn_offset: int = 0):
+        N = self.N
+
+        # Central ring parameters
+        size = N // 2
+        offset = N % 2
+        center = -0.5 * (offset - 1)
+        r1, r2 = size - ring_offset - 1, size - ring_offset
+        side_length = 2 * (r1 + 1)
+
+        # Create the outer ring
+        y, x = np.ogrid[-size + center:size + offset + center, -size + center:size + offset + center]
+        mask1 = (np.abs(x) <= r1) & (np.abs(y) <= r1)
+        mask2 = (np.abs(x) <= r2) & (np.abs(y) <= r2)
+        mask = mask2 ^ mask1
+
+        yy, xx = np.where(mask)
+        indices = yy * N + xx
+
+        # Get each section of the ring independently
+        top = indices[:side_length]
+        right = indices[side_length:3 * side_length:2]
+        bottom = indices[3 * side_length:]
+        left = indices[side_length + 1:3 * side_length + 1:2]
+
+        # Assigned each section a direction facing away from the wall
+        directions = np.arange(side_length * 4) // side_length
+        directions = (directions + 2) % 4
+
+        # Extract the start locations and directions from the ordered ring
+        sections = np.array_split(np.concatenate([top, right, bottom[::-1], left[::-1]]), self.num_players)
+        directions = np.array_split(directions, self.num_players)
+
+        def get_centers(array_list, offsets):
+            clamp = lambda val, lower, upper: max(min(val, upper), lower)
+            indices = (clamp(arr.size // 2 + offset, 0, arr.size - 1) for arr, offset in zip(array_list, offsets))
+            centers = starmap(lambda arr, index: arr[index], zip(array_list, indices))
+            return np.fromiter(centers, np.int64, len(array_list))
+
+        if isinstance(spawn_offset, int):
+            spawn_offset = (spawn_offset, spawn_offset + 1)
+        offsets = [np.random.randint(*spawn_offset) for _ in range(self.num_players)]
+
+        return get_centers(sections, offsets), get_centers(directions, offsets)
+
+    def new_state(self, num_players: int = None, ring_offset: int = 1, spawn_offset: int = 0) -> Tuple[object, List[int]]:
         """ Create an initial tron state.
 
         Parameters
@@ -187,6 +233,12 @@ class TronGridEnvironment(BaseEnvironment):
             The number of players for the game.
             Note, this option gets ignored here in favor of the global player configuration when creating
             the environment.
+        ring_offset: int
+            How into the arena the spawn ring is created. For example, if ring offset is 1, then the players
+            will spawn 1 black away from the wall.
+        spawn_offset: int or tuple
+            The offset given to all of the players spawn positions along their spawn region.
+            If it is a tuple, randomly chosen offset from the range.
 
         Returns
         -------
@@ -199,11 +251,9 @@ class TronGridEnvironment(BaseEnvironment):
         assert num_players == self.num_players, "Do not change the number of players from the game configuration."
 
         # Generate the Starting configuration
-        # TODO Make the starting points fair and spread out
         np.random.seed(int(time()))
         board = np.zeros((self.N, self.N), dtype=np.int64)
-        heads = np.random.choice(self.N * self.N, size=self.num_players, replace=False)
-        directions = np.random.randint(0, 4, size=num_players, dtype=np.int64)
+        heads, directions = self.generate_start_positions(ring_offset, spawn_offset)
         deaths = np.zeros(self.num_players, dtype=np.int64)
 
         # Set up the initial board
@@ -325,7 +375,7 @@ class TronGridEnvironment(BaseEnvironment):
         See Also
         --------
         colosseumrl.envs.tron.TronGridEnvironment.observation_names
-            The list of observatio keys.
+            The list of observation keys.
         colosseumrl.envs.tron.TronGridEnvironment.observation_shapes
             The sizes of each observation.
         """
@@ -408,4 +458,23 @@ class TronGridEnvironment(BaseEnvironment):
             The current game state.
         """
         return loads(serialized_state)
+
+    # Customer Helpers
+    @staticmethod
+    def next_cell(x, y, direction, board_size: int = None):
+        if direction == 0:  # North
+            y = y - 1
+        elif direction == 1:  # East
+            x = x + 1
+        elif direction == 2:  # South
+            y = y + 1
+        elif direction == 3:  # West
+            x = x - 1
+
+        if board_size:
+            x = max(min(x, board_size - 1), 0)
+            y = max(min(y, board_size - 1), 0)
+
+        return x, y
+
 

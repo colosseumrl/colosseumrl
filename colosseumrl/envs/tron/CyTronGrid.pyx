@@ -33,11 +33,11 @@ cpdef void next_state_inplace(long[:, ::1] board,
         # Compute the new move location for this head
         if direction == 0: # North
             y = y - 1
-        elif direction == 1: # West
+        elif direction == 1: # East
             x = x + 1
         elif direction == 2: # South
             y = y + 1
-        elif direction == 3: # East
+        elif direction == 3: # West
             x = x - 1
 
         # Update our player's direction

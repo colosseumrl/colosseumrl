@@ -39,7 +39,7 @@ else:
 
 setup(
     name="colosseumrl",
-    version="1.0.4",
+    version="1.0.5",
     author="Alexander Shmakov",
     author_email="alexanders101@gmail.com",
     description="UC Irvine multi-agent reinforcement learning framework",
@@ -51,7 +51,6 @@ setup(
     ext_modules=ext_modules,
     install_requires=requirements,
     classifiers=[
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "License :: OSI Approved :: MIT License",
