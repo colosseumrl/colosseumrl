@@ -8,15 +8,22 @@ from gym.envs.classic_control import rendering
 class TronRender:
     BACKGROUND_COLOR = (0.14, 0.14, 0.14)
     BLANK_COLOR = (0.85, 0.85, 0.85)
+    LOSS_COLOR = (0.3, 0.1, 0.1)
+    WIN_COLOR = (0.1, 0.3, 0.1)
 
     def __init__(self, board_size: int, num_players: int,
                  window_size: Tuple[int, int] = (600, 600),
                  outside_border: int = 25,
-                 grid_space_ratio: float = 6):
+                 grid_space_ratio: float = 6,
+                 winner_player: int = None):
         self.board_size = board_size
         self.window_size = window_size
         self.outside_border = outside_border
         self.grid_space_ratio = grid_space_ratio
+
+        self.winner_player = winner_player
+        if winner_player is not None:
+            self.other_players = (np.arange(num_players - 1) + winner_player + 1) % num_players
 
         self.colors = cm.plasma(np.linspace(0.1, 0.9, num_players))
         self.colors = np.minimum(self.colors * 1.3, 1.0)
@@ -85,6 +92,8 @@ class TronRender:
 
         flat_board = state[0].ravel()
         heads = set(state[1])
+        deaths = state[3]
+
         for idx in np.where(flat_board > 0)[0]:
             x = idx % self.board_size
             y = idx // self.board_size
@@ -93,8 +102,15 @@ class TronRender:
 
             self.grid[y][x].set_color(*(factor * self.colors[val, :-1]))
 
+        if self.winner_player is not None:
+            if deaths[self.winner_player] > 0:
+                self.background.set_color(*self.LOSS_COLOR)
+            else:
+                if all(deaths[player] > 0 for player in self.other_players):
+                    self.background.set_color(*self.WIN_COLOR)
+
         return self.viewer.render(return_rgb_array=mode == 'rgb_array')
 
     def render_observation(self, observation, mode='human'):
-        state = [observation['board'], observation['heads']]
+        state = [observation['board'], observation['heads'], None, observation['deaths']]
         return self.render(state, mode='human')

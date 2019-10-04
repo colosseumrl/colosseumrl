@@ -49,9 +49,9 @@ class TronRayEnvironment(MultiAgentEnv):
         num_players = self.env.num_players
         alive_players = set(self.players)
 
-        observations = {str(i): self.env.state_to_observation(self.state, i) for i in range(num_players)}
-        rewards = {str(i): rewards[i] for i in range(num_players)}
-        dones = {str(i): i not in alive_players for i in range(num_players)}
+        observations = {str(i): self.env.state_to_observation(self.state, i) for i in map(int, action_dict.keys())}
+        rewards = {str(i): rewards[i] for i in map(int, action_dict.keys())}
+        dones = {str(i): i not in alive_players for i in map(int, action_dict.keys())}
         dones['__all__'] = terminal
 
         return observations, rewards, dones, {}

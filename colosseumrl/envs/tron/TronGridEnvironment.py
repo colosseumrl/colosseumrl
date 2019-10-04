@@ -316,6 +316,8 @@ class TronGridEnvironment(BaseEnvironment):
 
         # Winner is the final player or nobody if tie
         winners = new_players if terminal else None
+        if winners is not None and len(winners) > 0:
+            rewards[winners] += 9
 
         return (new_board, new_heads, new_directions, new_deaths), new_players, rewards, terminal, winners
 
