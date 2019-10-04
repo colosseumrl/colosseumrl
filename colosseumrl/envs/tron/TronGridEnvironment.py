@@ -39,7 +39,7 @@ def parse_tron_config(config: str) -> Tuple:
 
     """
     if len(config) == 0:
-        return 20, 4, -1, False
+        return 19, 4, -1, False
 
     def parse(inp: str):
         try:
@@ -66,7 +66,7 @@ class TronGridEnvironment(BaseEnvironment):
     }
 
     @staticmethod
-    def create(board_size: int = 20,
+    def create(board_size: int = 19,
                num_players: int = 4,
                observation_window: int = -1,
                remove_on_death: bool = False) -> "TronGridEnvironment":
@@ -224,7 +224,7 @@ class TronGridEnvironment(BaseEnvironment):
 
         return get_centers(sections, offsets), get_centers(directions, offsets)
 
-    def new_state(self, num_players: int = None, ring_offset: int = 1, spawn_offset: int = 0) -> Tuple[object, List[int]]:
+    def new_state(self, num_players: int = None, ring_offset: int = 1, spawn_offset: int = 2) -> Tuple[object, List[int]]:
         """ Create an initial tron state.
 
         Parameters

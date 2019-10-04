@@ -11,22 +11,20 @@ These are left out of the global dependency list in order to simplify installati
 from colosseumrl.matchmaking import request_game, GameResponse
 from colosseumrl.RLApp import create_rl_agent
 from colosseumrl.envs.tron import TronGridClientEnvironment
-from colosseumrl.envs.tron import TronGridEnvironment
+from colosseumrl.envs.tron import TronGridEnvironment, TronRender
 
 from colosseumrl.rl_logging import init_logging
 
 from random import randint
-import cv2
 import argparse
 from threading import Thread
 from time import sleep, time
-import numpy as np
 from pynput.keyboard import Key, Listener
 
 
 logger = init_logging()
 
-FRAME_MILLISECONDS = 200
+FRAME_MILLISECONDS = 500
 
 
 class Action:
@@ -67,6 +65,7 @@ class ControlThread(Thread):
                 print("UP")
 
         with Listener(on_press=on_press) as listener:
+            self.listener = listener
             listener.join()
 
 def tron_client(env: TronGridClientEnvironment, username: str):
@@ -81,14 +80,13 @@ def tron_client(env: TronGridClientEnvironment, username: str):
     control_thread.start()
 
     frame_start_time = time()
+
+    board_size = env.server_environment.N
+    num_players = env.server_environment.num_players
+    renderer = TronRender(board_size, num_players)
+
     while True:
-
-        board = env.board()
-        im = cv2.applyColorMap(np.uint8(board * 255 // np.max(board)), cv2.COLORMAP_JET)
-        im = cv2.resize(im, (420, 420), interpolation=cv2.INTER_NEAREST)
-
-        cv2.imshow("Tron", im)
-        cv2.waitKey(1)
+        renderer.render_observation(env.observation)
         frame_delta = time() - frame_start_time
         sleep((FRAME_MILLISECONDS / 1000) - frame_delta)
 
@@ -100,8 +98,7 @@ def tron_client(env: TronGridClientEnvironment, username: str):
         if terminal:
             logger.info("Game is over. Players {} won".format(winners))
             logger.info("Final observation: {}".format(new_obs))
-            cv2.destroyAllWindows()
-
+            renderer.close()
             break
 
 

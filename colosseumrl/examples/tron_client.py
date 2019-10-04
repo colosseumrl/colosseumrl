@@ -8,13 +8,14 @@ import argparse
 
 from random import choice, randint
 
+from colosseumrl.envs.tron.rllib import SimpleAvoidAgent
 from colosseumrl.matchmaking import request_game, GameResponse
 from colosseumrl.RLApp import create_rl_agent
 from colosseumrl.envs.tron import TronGridClientEnvironment
 from colosseumrl.envs.tron import TronGridEnvironment
-from colosseumrl.rl_logging import init_logging
+from colosseumrl.rl_logging import get_logger
 
-logger = init_logging()
+logger = get_logger()
 
 
 def tron_client(env: TronGridClientEnvironment, username: str):
@@ -39,13 +40,11 @@ def tron_client(env: TronGridClientEnvironment, username: str):
 
     # Keep executing moves until the game is over
     terminal = False
+    agent = SimpleAvoidAgent()
+
     while not terminal:
         # See if there is a wall in front of us, if there is, then we will turn in a random direction.
-        n_loc, n_obj = env.next_location()
-        if n_obj == 0:
-            action = 'forward'
-        else:
-            action = choice(['left', 'right'])
+        action = agent(env.server_environment, env.observation)
 
         # We use env.step in order to execute an action and wait until it is our turn again.
         # This function will block while the action is executed and will return the next observation that belongs to us

@@ -1,8 +1,8 @@
 import numpy as np
 import random
 
-from matplotlib import cm
-from . import TronGridEnvironment
+from .TronGridEnvironment import TronGridEnvironment
+from .TronRender import TronRender
 
 import gym
 from gym.spaces import Dict, Discrete, Box
@@ -17,6 +17,8 @@ class TronRayEnvironment(MultiAgentEnv):
         self.env = TronGridEnvironment.create(board_size=board_size, num_players=num_players)
         self.state = None
         self.players = None
+
+        self.renderer = TronRender(board_size, num_players)
 
         self.observation_space = Dict({
             'board': Box(0, num_players, shape=(board_size, board_size)),
@@ -53,6 +55,15 @@ class TronRayEnvironment(MultiAgentEnv):
         dones['__all__'] = terminal
 
         return observations, rewards, dones, {}
+
+    def render(self, mode='human'):
+        if self.state is None:
+            return None
+
+        return self.renderer.render(self.state, mode)
+
+    def close(self):
+        self.renderer.close()
 
 
 class SimpleAvoidAgent:
@@ -96,9 +107,7 @@ class TronRaySinglePlayerEnvironment(gym.Env):
         self.spawn_offset = spawn_offset
         self.agent = agent
 
-        self.render_viewer = None
-        self.render_colors = cm.plasma(np.linspace(0.1, 0.9, num_players))
-        self.render_colors = np.minimum(self.render_colors * 1.3, 1.0)
+        self.renderer = TronRender(board_size, num_players)
 
         self.observation_space = Dict({
             'board': Box(0, num_players, shape=(board_size, board_size)),
@@ -141,69 +150,11 @@ class TronRaySinglePlayerEnvironment(gym.Env):
         return observation, reward, done, {}
 
     def render(self, mode='human'):
-        # Constants
-        screen_width = 500
-        screen_height = 500
-        border_space = 25
-        grid_space_ratio = 6
+        if self.state is None:
+            return None
 
-        background_color = (0.14, 0.14, 0.14)
-        blank_color = (0.85, 0.85, 0.85)
-        board_size = self.env.N
-
-        if self.render_viewer is None:
-            from gym.envs.classic_control import rendering
-            self.render_viewer = rendering.Viewer(screen_width, screen_height)
-            gridx = (border_space, screen_width - border_space)
-            gridy = (border_space, screen_height - border_space)
-
-            background = rendering.FilledPolygon(
-                [(0, 0), (screen_width, 0), (screen_width, screen_height), (0, screen_height)])
-            background.set_color(*background_color)
-
-            grid_size_x = (gridx[1] - gridx[0]) / board_size
-            grid_size_y = (gridy[1] - gridy[0]) / board_size
-            grid_space = min(grid_size_x, grid_size_y) / grid_space_ratio
-
-            self.render_grid = []
-            self.render_flatgrid = []
-
-            for y in range(board_size):
-                row = []
-                for x in range(board_size):
-                    startx = gridx[0] + x * grid_size_x + grid_space
-                    endx = startx + grid_size_x - 2 * grid_space
-
-                    starty = gridy[0] + y * grid_size_y + grid_space
-                    endy = starty + grid_size_y - 2 * grid_space
-
-                    box = rendering.FilledPolygon([(startx, starty), (endx, starty), (endx, endy), (startx, endy)])
-                    box.set_color(*blank_color)
-                    row.append(box)
-                    self.render_flatgrid.append(box)
-
-                self.render_grid.append(row)
-
-            self.render_viewer.add_geom(background)
-            for box in self.render_flatgrid:
-                self.render_viewer.add_geom(box)
-
-        if self.state is None: return None
-
-        flat_board = self.state[0].ravel()
-        heads = set(self.state[1])
-        for idx in np.where(flat_board > 0)[0]:
-            x = idx % board_size
-            y = idx // board_size
-            val = flat_board[idx] - 1
-            factor = 1.0 if idx in heads else 0.6
-
-            self.render_grid[y][x].set_color(*(factor * self.render_colors[val, :-1]))
-
-        return self.render_viewer.render(return_rgb_array=mode == 'rgb_array')
+        return self.renderer.render(self.state, mode)
 
     def close(self):
-        if self.render_viewer:
-            self.render_viewer.close()
-            self.render_viewer = None
+        self.renderer.close()
 
