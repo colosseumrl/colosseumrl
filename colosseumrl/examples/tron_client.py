@@ -49,7 +49,7 @@ def tron_client(env: TronGridClientEnvironment, username: str):
         # We use env.step in order to execute an action and wait until it is our turn again.
         # This function will block while the action is executed and will return the next observation that belongs to us
         new_obs, reward, terminal, winners = env.step(action)
-        logger.debug("Took step with action {}, got: {}".format(action, (new_obs, reward, terminal, winners)))
+        print("Took step with action {}, got: {}".format(action, (new_obs, reward, terminal, winners)))
 
     # Once the game is over, we print out the results and close the agent.
     logger.info("Game is over. Players {} won".format(winners))

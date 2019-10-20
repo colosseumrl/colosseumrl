@@ -2,9 +2,6 @@ import numpy as np
 from typing import Tuple
 from matplotlib import cm
 
-from gym.envs.classic_control import rendering
-
-
 class TronRender:
     BACKGROUND_COLOR = (0.14, 0.14, 0.14)
     BLANK_COLOR = (0.85, 0.85, 0.85)
@@ -35,6 +32,8 @@ class TronRender:
         self.background = None
 
     def start(self):
+        from gym.envs.classic_control import rendering
+        
         screen_width, screen_height = self.window_size
         border_space = self.outside_border
         grid_space_ratio = self.grid_space_ratio

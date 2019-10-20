@@ -7,10 +7,10 @@ from .TronRender import TronRender
 import gym
 from gym.spaces import Dict, Discrete, Box
 
-from ray.rllib.env.multi_agent_env import MultiAgentEnv
+# from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 
-class TronRayEnvironment(MultiAgentEnv):
+class TronRayEnvironment():
     action_space = Discrete(3)
 
     def __init__(self, board_size=15, num_players=4):
