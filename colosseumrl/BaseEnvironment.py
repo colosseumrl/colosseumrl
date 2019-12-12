@@ -281,3 +281,62 @@ class BaseEnvironment(ABC):
             The current game state.
         """
         raise NotImplementedError
+
+
+class SimpleConfigParser:
+    def __init__(self, *types):
+        """ Helper class to create config parsers for environments.
+
+        Parameters
+        ----------
+        types:
+            list of types with optional default values. Each entry can either be
+            a single type or a tuple containing the type and default value.
+
+            Note: All default-values arguments must come after the required arguments.
+
+        """
+        self.types = []
+        for type in types:
+            if isinstance(type, (tuple, list)):
+                type, default, value = type[0], True, type[1]
+            else:
+                default, value = False, None
+
+            self.types.append((type, default, value))
+
+    def parse(self, config):
+        config = [] if config is None else config.split(";")
+        options = []
+
+        last = -1
+        for last, (option, (type, _, _)) in enumerate(zip(config, self.types)):
+            option = type(option) if option != "None" else None
+            options.append(option)
+
+        # If we have values for everything, then return now
+        if len(config) == len(self.types):
+            return options
+
+        # If we're missing a required option, then error out
+        last = last + 1
+        if not self.types[last][1]:
+            raise ValueError("Required Argument not provided: Option {}".format(last))
+
+        # If we have default values remaining, fill them out.
+        for (type, _, option) in self.types[last:]:
+            options.append(option)
+
+        return options
+
+    def store(self, *args):
+        options = [str(value) for _, _, value in self.types]
+
+        i = 0
+        for i, option in enumerate(args):
+            options[i] = str(option)
+
+        if (len(args) < len(self.types)) and (not self.types[i + 1][1]):
+            raise ValueError("Not enough required arguments provided.")
+
+        return ";".join(options)
