@@ -1,7 +1,7 @@
 """ Monolithic game server function. This file contains all the backend logic to execute moves and
 push the observations to the agents. """
 
-import dill
+import dill, json
 import argparse
 
 from multiprocessing import Event
@@ -236,6 +236,11 @@ def server_app(dataframe: Dataframe,
     for player in players.values():
         player.turn = True
 
+    # Compute final rankings for this game and push them to the players so they can inform themselves how the performed
+    rankings = env.compute_ranking(state, list(range(len(players))), winners)
+    ranking_dict = {players_by_number[number].name: ranking for number, ranking in rankings.items()}
+    server_state.rankings = json.dumps(ranking_dict)
+
     dataframe.commit()
     dataframe.push()
 
@@ -248,9 +253,6 @@ def server_app(dataframe: Dataframe,
     for player in players.values():
         while not player.acknowledges_game_over and not fr.tick():
             dataframe.checkout()
-
-    rankings = env.compute_ranking(state, list(range(len(players))), winners)
-    ranking_dict = {players_by_number[number].name: ranking for number, ranking in rankings.items()}
 
     logger.info("Game has ended. Player {} is the winner.".format([key for key, value in ranking_dict.items() if value == 0]))
     return ranking_dict

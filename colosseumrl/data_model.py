@@ -79,6 +79,7 @@ class ServerState(object):
     terminal = dimension(bool)
     server_no_longer_joinable = dimension(bool)
     winners = dimension(str)
+    rankings = dimension(str)
     serialized_state = dimension(bytes)
 
     def __init__(self, env_class_name, env_config, env_dimensions):
@@ -89,4 +90,5 @@ class ServerState(object):
         self.terminal = False
         self.server_no_longer_joinable = False
         self.winners = ""
+        self.rankings = ""
         self.serialized_state = b""

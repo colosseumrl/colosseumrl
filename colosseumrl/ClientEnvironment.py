@@ -305,7 +305,8 @@ class ClientEnvironment:
         return self.observation
 
     def reset(self):
-        return self.wait_for_start()
+        self.wait_for_start()
+        return self.observation
 
     def wait_for_start(self, timeout: Optional[float] = None):
         """ Secondary name for to be clearer when starting game. """

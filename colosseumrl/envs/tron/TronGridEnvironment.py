@@ -3,6 +3,7 @@ from typing import Dict, Tuple, List
 from dill import dumps, loads
 from time import time
 from itertools import starmap
+from collections import Counter
 
 from colosseumrl.BaseEnvironment import BaseEnvironment
 from .CyTronGrid import next_state_inplace, relative_player_inplace
@@ -478,5 +479,32 @@ class TronGridEnvironment(BaseEnvironment):
             y = max(min(y, board_size - 1), 0)
 
         return x, y
+
+    def compute_ranking(self, state: object, players: [int], winners: [int]) -> Dict[int, int]:
+        board, _, _, deaths = state
+        num_players = deaths.shape[0]
+
+        # Find scores for each player to be the length of their tail
+        scores = Counter(state[0].ravel() - 1)
+        del scores[-1]
+
+        # Rebalance ties
+        tie_locations = np.where(deaths[deaths - 1] - np.arange(num_players) - 1 == 0)[0]
+        for tie in tie_locations:
+            killer = deaths[tie] - 1
+            scores[tie] = min(scores[tie], scores[killer])
+
+        # Compute Rankings
+        rankings = {}
+        previous_score = np.inf
+
+        for next_rank, (player, score) in enumerate(scores.most_common()):
+            if score < previous_score:
+                current_rank = next_rank
+
+            rankings[player] = current_rank
+            previous_score = score
+
+        return rankings
 
 
