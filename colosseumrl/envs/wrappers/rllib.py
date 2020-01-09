@@ -47,9 +47,9 @@ class RllibWrapper(MultiAgentEnv):
         observations = {player: self.env.state_to_observation(self.state, int(player)) for player in action_dict}
         reward_dict = {player: rewards[int(player)] for player in action_dict}
 
-        done_dict = self.create_done_dict(self.state, self.players, rewards, winners, action_dict)
+        done_dict = self.create_done_dict(self.state, self.players, rewards, terminal, action_dict)
         done_dict['__all__'] = terminal
 
-        info_dict = self.create_info_dict(self.state, self.players, rewards, winners, action_dict)
+        info_dict = self.create_info_dict(self.state, self.players, rewards, terminal, action_dict)
 
         return observations, reward_dict, done_dict, info_dict

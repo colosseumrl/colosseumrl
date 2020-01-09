@@ -27,7 +27,7 @@ class TronRllibEnvironment(RllibWrapper):
 
     def create_done_dict(self, state, players, rewards, terminal, action_dict):
         alive_players = set(map(str, players))
-        return {player: (player not in alive_players) or terminal for player in action_dict}
+        return {player: ((player not in alive_players) or terminal) for player in action_dict}
 
     def action_map(self, action):
         if action == 0:
