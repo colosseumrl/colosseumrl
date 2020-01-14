@@ -21,27 +21,27 @@ from . import computation as comp
 # Stores structure of all playable pieces
 # key: piece name:
 # val: default offsets from index
-PIECE_TYPES = {"monomino1": np.array([(0, 0)]),
-               "domino1": np.array([(0, 0), (1, 0)]),
-               "trominoe1": np.array([(0, 0), (1, 0), (1, 1)]),
-               "trominoe2": np.array([(0, 0), (1, 0), (2, 0)]),
-               "tetrominoes1": np.array([(0, 0), (1, 0), (0, 1), (1, 1)]),
-               "tetrominoes2": np.array([(0, 0), (1, -1), (1, 0), (2, 0)]),
-               "tetrominoes3": np.array([(0, 0), (1, 0), (2, 0), (3, 0)]),
-               "tetrominoes4": np.array([(0, 0), (1, 0), (2, 0), (2, -1)]),
-               "tetrominoes5": np.array([(0, 0), (1, 0), (1, -1), (2, -1)]),
-               "pentominoe1": np.array([(0, 0), (0, -1), (1, 0), (2, 0), (3, 0)]),
-               "pentominoe2": np.array([(0, 0), (0, -1), (0, 1), (1, 0), (2, 0)]),
-               "pentominoe3": np.array([(0, 0), (0, -1), (0, -2), (1, -2), (2, -2)]),
-               "pentominoe4": np.array([(0, 0), (1, 0), (1, -1), (2, -1), (3, -1)]),
-               "pentominoe5": np.array([(0, 0), (0, 1), (1, 0), (2, 0), (2, -1)]),
-               "pentominoe6": np.array([(0, 0), (1, 0), (2, 0), (3, 0), (4, 0)]),
-               "pentominoe7": np.array([(0, 0), (1, 0), (2, 0), (1, -1), (2, -1)]),
-               "pentominoe8": np.array([(0, 0), (0, 1), (1, 0), (1, -1), (2, -1)]),
-               "pentominoe9": np.array([(0, 0), (1, 0), (0, 1), (0, 2), (1, 2)]),
-               "pentominoe10": np.array([(0, 0), (1, 0), (1, -1), (1, 1), (2, -1)]),
-               "pentominoe11": np.array([(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)]),
-               "pentominoe12": np.array([(0, 0), (1, 0), (1, -1), (2, 0), (3, 0)])}
+PIECE_TYPES = {"monomino1": np.array([(0, 0)], dtype=np.int64),
+               "domino1": np.array([(0, 0), (1, 0)], dtype=np.int64),
+               "trominoe1": np.array([(0, 0), (1, 0), (1, 1)], dtype=np.int64),
+               "trominoe2": np.array([(0, 0), (1, 0), (2, 0)], dtype=np.int64),
+               "tetrominoes1": np.array([(0, 0), (1, 0), (0, 1), (1, 1)], dtype=np.int64),
+               "tetrominoes2": np.array([(0, 0), (1, -1), (1, 0), (2, 0)], dtype=np.int64),
+               "tetrominoes3": np.array([(0, 0), (1, 0), (2, 0), (3, 0)], dtype=np.int64),
+               "tetrominoes4": np.array([(0, 0), (1, 0), (2, 0), (2, -1)], dtype=np.int64),
+               "tetrominoes5": np.array([(0, 0), (1, 0), (1, -1), (2, -1)], dtype=np.int64),
+               "pentominoe1": np.array([(0, 0), (0, -1), (1, 0), (2, 0), (3, 0)], dtype=np.int64),
+               "pentominoe2": np.array([(0, 0), (0, -1), (0, 1), (1, 0), (2, 0)], dtype=np.int64),
+               "pentominoe3": np.array([(0, 0), (0, -1), (0, -2), (1, -2), (2, -2)], dtype=np.int64),
+               "pentominoe4": np.array([(0, 0), (1, 0), (1, -1), (2, -1), (3, -1)], dtype=np.int64),
+               "pentominoe5": np.array([(0, 0), (0, 1), (1, 0), (2, 0), (2, -1)], dtype=np.int64),
+               "pentominoe6": np.array([(0, 0), (1, 0), (2, 0), (3, 0), (4, 0)], dtype=np.int64),
+               "pentominoe7": np.array([(0, 0), (1, 0), (2, 0), (1, -1), (2, -1)], dtype=np.int64),
+               "pentominoe8": np.array([(0, 0), (0, 1), (1, 0), (1, -1), (2, -1)], dtype=np.int64),
+               "pentominoe9": np.array([(0, 0), (1, 0), (0, 1), (0, 2), (1, 2)], dtype=np.int64),
+               "pentominoe10": np.array([(0, 0), (1, 0), (1, -1), (1, 1), (2, -1)], dtype=np.int64),
+               "pentominoe11": np.array([(0, 0), (-1, 0), (1, 0), (0, -1), (0, 1)], dtype=np.int64),
+               "pentominoe12": np.array([(0, 0), (1, 0), (1, -1), (2, 0), (3, 0)], dtype=np.int64)}
 
 # All possible piece orientations, listed in clockwise order
 ORIENTATIONS = ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest"]
@@ -82,7 +82,7 @@ class Board:
         if copy_from_board is not None:
             self.board_contents = deepcopy(copy_from_board.board_contents)
         else:
-            self.board_contents = np.zeros((20, 20), dtype=int)
+            self.board_contents = np.zeros((20, 20), dtype=np.int64)
 
     def update_board(self, player_color, piece_type, index, piece_orientation, round_count, ai_game):
         ''' Takes index point and places piece_type on board
